@@ -1,6 +1,6 @@
 # Browser Cookie #
 
-* ***What does it do?*** Loads cookies used by your web browser into a python cookiejar object. 
+* ***What does it do?*** Loads cookies used by your web browser into a cookiejar object. 
 * ***Why is it useful?*** This means you can use python to download and get the same content you see in the web browser without needing to login.
 * ***Which browsers are supported?*** Currently Chrome and Firefox.
 * ***How are the cookies stored?*** In a sqlite database in your home directory.
@@ -47,7 +47,7 @@ Now let's try with browser_cookie - make sure you are logged into Bitbucket in F
 
 You should see your own username here, meaning the module successfully loaded the cookies from Firefox.
 
-Here is an alternative example with [requests](), this time loading the Chrome cookies. Again make sure you are logged into Bitbucket in Chrome before running this:
+Here is an alternative example with [requests](http://docs.python-requests.org/en/latest/), this time loading the Chrome cookies. Again make sure you are logged into Bitbucket in Chrome before running this:
 ```
 #!python
 
