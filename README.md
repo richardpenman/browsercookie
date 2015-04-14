@@ -5,7 +5,7 @@ The browser_cookie module loads cookies used by your web browser into a python c
 ```
 #!bash
 
-    pip install browser_cookie
+    pip install browser-cookie
 
 ```
 
