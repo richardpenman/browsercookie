@@ -57,7 +57,9 @@ Here is an alternative example with [requests](), this time loading the Chrome c
 
 ## Contribute ##
 So far this module supports the following platforms:
- * Chrome: Linux, OSX
- * Firefox: Linux, OSX, Windows
+
+* Chrome: Linux, OSX
+* Firefox: Linux, OSX, Windows
+ 
 
 However I only tested on a single version of each browser and so am not sure if the cookie sqlite format changes location or format in earlier/later versions. If you experience a problem please [open an issue](https://bitbucket.org/richardpenman/browser_cookie/issues/new) which includes details of the browser version and operating system. Also patches to support other browsers are very welcome, particularly for Chrome and Internet Explorer on Windows.
