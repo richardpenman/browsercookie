@@ -22,6 +22,7 @@ Here is a dangerous hack to extract the *title* from a webpage:
 And here is the webpage title when downloaded normally:
 ```
 #!python
+>>> import urllib2
 >>> url = 'https://bitbucket.org/'
 >>> public_html = urllib2.urlopen(url).read()
 >>> get_title(public_html)
@@ -32,7 +33,6 @@ Now let's try with browser_cookie - make sure you are logged into Bitbucket in F
 ```
 #!python
 
->>> import urllib2
 >>> import browser_cookie
 >>> cj = browser_cookie.firefox()
 >>> opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
@@ -60,4 +60,4 @@ So far this module supports the following platforms:
  * Chrome: Linux, OSX
  * Firefox: Linux, OSX, Windows
 
-However I only tested on a single version of each browser and so am not sure if the cookie sqlite format changes location or format in earlier/later versions. If you experience a problem please [open an issue](https://bitbucket.org/richardpenman/browser_cookie/issues/new) which includes details of the browser version and operating system. Also patches to support other browsers are very welcome, particularly for Chrome and Internet Explorer on Windows. 
+However I only tested on a single version of each browser and so am not sure if the cookie sqlite format changes location or format in earlier/later versions. If you experience a problem please [open an issue](https://bitbucket.org/richardpenman/browser_cookie/issues/new) which includes details of the browser version and operating system. Also patches to support other browsers are very welcome, particularly for Chrome and Internet Explorer on Windows.
