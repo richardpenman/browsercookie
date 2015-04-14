@@ -181,22 +181,22 @@ def create_cookie(host, path, secure, expires, name, value):
     return cookielib.Cookie(0, name, value, None, False, host, host.startswith('.'), host.startswith('.'), path, True, secure, expires, False, None, None, {})
 
 
-def chrome_cookie(cookie_filename=None):
+def chrome(cookie_file=None):
     """Returns a cookiejar of the cookies used by Chrome
     """
-    return Chrome(cookie_filename).load()
+    return Chrome(cookie_file).load()
 
 
-def firefox_cookie(cookie_file=None):
+def firefox(cookie_file=None):
     """Returns a cookiejar of the cookies and sessions used by Firefox
     """
     return Firefox(cookie_file).load()
 
 
-def browser_cookie():
+def browser():
     """Try to load cookies from all suppoerted browsers and return first one successfuly loaded
     """
-    for cookie_fn in chrome_cookie, firefox_cookie:
+    for cookie_fn in [chrome, firefox]:
         try:
             cj = cookie_fn()
         except BrowserCookieError:
