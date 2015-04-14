@@ -1,5 +1,9 @@
 # Browser Cookie #
-The browser_cookie module loads cookies used by your web browser into a python cookiejar object, which means you can then download with urllib and other libraries and get the same content you see in the web browser. This is useful when you want to interact with a website while logged in.
+
+* ***What does it do?*** Loads cookies used by your web browser into a python cookiejar object. 
+* ***Why is it useful?*** This means you can use python to download and get the same content you see in the web browser without needing to login.
+* ***Which browsers are supported?*** Currently Chrome and Firefox.
+* ***How are the cookies stored?*** In a sqlite database in your home directory.
 
 ## Install ##
 ```
@@ -12,7 +16,7 @@ The browser_cookie module loads cookies used by your web browser into a python c
 
 ## Usage ##
 
-Here is a dangerous hack to extract the *title* from a webpage:
+Here is a dangerous hack to extract the ***title*** from a webpage:
 ```
 #!python
 >>> import re
@@ -41,7 +45,7 @@ Now let's try with browser_cookie - make sure you are logged into Bitbucket in F
 'richardpenman / home &mdash; Bitbucket'
 ```
 
-You should see your own username here, meaning the module successfully loaded the browser cookies.
+You should see your own username here, meaning the module successfully loaded the cookies from Firefox.
 
 Here is an alternative example with [requests](), this time loading the Chrome cookies. Again make sure you are logged into Bitbucket in Chrome before running this:
 ```
@@ -56,7 +60,7 @@ Here is an alternative example with [requests](), this time loading the Chrome c
 
 
 ## Contribute ##
-So far this module supports the following platforms:
+So far the following platforms are supported:
 
 * Chrome: Linux, OSX
 * Firefox: Linux, OSX, Windows
