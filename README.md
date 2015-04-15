@@ -58,7 +58,7 @@ Here is an alternative example with [requests](http://docs.python-requests.org/e
 'richardpenman / home &mdash; Bitbucket'
 ```
 
-Alternatively if you don't know/care which browser has the cookies you want then all available browser cookies can be loaded with the load function:
+Alternatively if you don't know/care which browser has the cookies you want then all available browser cookies can be loaded:
 ```
 #!python
 >>> cj = browser_cookie.load()
