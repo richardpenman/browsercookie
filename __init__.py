@@ -193,14 +193,14 @@ def firefox(cookie_file=None):
     return Firefox(cookie_file).load()
 
 
-def browser():
-    """Try to load cookies from all suppoerted browsers and return first one successfuly loaded
+def load():
+    """Try to load cookies from all supported browsers and return combined cookiejar
     """
+    cj = cookielib.CookieJar()
     for cookie_fn in [chrome, firefox]:
         try:
-            cj = cookie_fn()
+            for cookie in cookie_fn():
+                cj.set_cookie(cookie)
         except BrowserCookieError:
             pass
-        else:
-            return cj
-    raise BrowserCookieError('Failed to load browser cookies')
+    return cj
