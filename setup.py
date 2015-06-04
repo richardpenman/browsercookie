@@ -1,5 +1,10 @@
+import sys
 import os
 from distutils.core import setup
+
+if sys.version_info.major >= 3:
+    print 'Sorry, currently only supports Python 2. Patches welcome!'
+    sys.exit(1)
 
 setup(
     name='browser-cookie', 
