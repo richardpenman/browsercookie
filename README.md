@@ -13,10 +13,11 @@
 
 ```
 
+Note only Python 2 is supported currently.
 
 ## Usage ##
 
-Here is a *dangerous* hack to extract the title from a webpage:
+Here is a hack to extract the title from a webpage:
 ```
 #!python
 >>> import re
