@@ -1,6 +1,6 @@
 # Browser Cookie #
 
-The *browser_cookie* module loads cookies used by your web browser into a cookiejar object. This can be useful if you want to use python to download the same content you see in the web browser without needing to login.
+The **browser_cookie** module loads cookies used by your web browser into a cookiejar object. This can be useful if you want to use python to download the same content you see in the web browser without needing to login.
 
 
 ## Install ##
@@ -33,7 +33,7 @@ And here is the webpage title when downloaded normally:
 'Git and Mercurial code management for teams'
 ```
 
-Now let's try with browser_cookie - make sure you are logged into Bitbucket in Firefox before trying this example:
+Now let's try with **browser_cookie** - make sure you are logged into Bitbucket in Firefox before trying this example:
 ```
 #!python
 
