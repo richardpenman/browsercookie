@@ -1,9 +1,7 @@
 # Browser Cookie #
 
-* ***What does it do?*** Loads cookies used by your web browser into a cookiejar object. 
-* ***Why is it useful?*** This means you can use python to download and get the same content you see in the web browser without needing to login.
-* ***Which browsers are supported?*** Currently Chrome and Firefox.
-* ***How are the cookies stored?*** In a sqlite database in your home directory.
+The *browser_cookie* module loads cookies used by your web browser into a cookiejar object. This can be useful if you want to use python to download the same content you see in the web browser without needing to login.
+
 
 ## Install ##
 ```
@@ -14,6 +12,7 @@
 ```
 
 Note only Python 2 is supported currently.
+
 
 ## Usage ##
 
