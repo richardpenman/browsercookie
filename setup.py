@@ -8,7 +8,7 @@ if sys.version_info.major >= 3:
 
 setup(
     name='browser-cookie', 
-    version='0.5',
+    version='0.6',
     packages=['browser_cookie'],
     package_dir={'browser_cookie' : '.'}, # look for package contents in current directory
     author='Richard Penman',
