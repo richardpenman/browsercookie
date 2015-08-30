@@ -13,6 +13,13 @@ Install
 
         pip install browser-cookie
 
+On Windows the builtin sqlite module will raise an error when loading
+the FireFox database. An updated version of sqlite can be installed with:
+
+.. sourcecode:: bash
+
+        pip install pysqlite
+
 Note only Python 2 is supported currently.
 
 Usage
