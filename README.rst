@@ -1,7 +1,7 @@
 Browser Cookie
 ==============
 
-The **browser\_cookie** module loads cookies used by your web browser
+The **browsercookie** module loads cookies used by your web browser
 into a cookiejar object. This can be useful if you want to use python to
 download the same content you see in the web browser without needing to
 login.
@@ -11,7 +11,7 @@ Install
 
 .. sourcecode:: bash
 
-        pip install browser-cookie
+        pip install browsercookie
 
 On Windows the builtin sqlite module will raise an error when loading
 the FireFox database. An updated version of sqlite can be installed with:
@@ -42,13 +42,13 @@ And here is the webpage title when downloaded normally:
     >>> get_title(public_html)
     'Git and Mercurial code management for teams'
 
-Now let's try with **browser\_cookie** - make sure you are logged into
+Now let's try with **browsercookie** - make sure you are logged into
 Bitbucket in Firefox before trying this example:
 
 .. sourcecode:: python
 
-    >>> import browser_cookie
-    >>> cj = browser_cookie.firefox()
+    >>> import browsercookie
+    >>> cj = browsercookie.firefox()
     >>> opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
     >>> login_html = opener.open(url).read()
     >>> get_title(login_html)
@@ -65,7 +65,7 @@ Bitbucket in Chrome before running this:
 .. sourcecode:: python
 
     >>> import requests
-    >>> cj = browser_cookie.chrome()
+    >>> cj = browsercookie.chrome()
     >>> r = requests.get(url, cookies=cj)
     >>> get_title(r.content)
     'richardpenman / home &mdash; Bitbucket'
@@ -75,7 +75,7 @@ want then all available browser cookies can be loaded:
 
 .. sourcecode:: python
     
-    >>> cj = browser_cookie.load()
+    >>> cj = browsercookie.load()
     >>> r = requests.get(url, cookies=cj)
     >>> get_title(r.content)
     'richardpenman / home &mdash; Bitbucket'
@@ -91,7 +91,7 @@ So far the following platforms are supported:
 However I only tested on a single version of each browser and so am not
 sure if the cookie sqlite format changes location or format in
 earlier/later versions. If you experience a problem please `open an
-issue <https://bitbucket.org/richardpenman/browser_cookie/issues/new>`__
+issue <https://bitbucket.org/richardpenman/browsercookie/issues/new>`__
 which includes details of the browser version and operating system. Also
 patches to support other browsers are very welcome, particularly for
 Chrome and Internet Explorer on Windows.
