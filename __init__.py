@@ -139,7 +139,7 @@ class Firefox:
         elif sys.platform == 'win32':
             cookie_files = glob.glob(os.path.join(os.getenv('PROGRAMFILES', ''), 'Mozilla Firefox/profile/cookies.sqlite')) or \
                            glob.glob(os.path.join(os.getenv('PROGRAMFILES(X86)', ''), 'Mozilla Firefox/profile/cookies.sqlite')) or \
-                           glob.glob(os.path.join(os.getenv('APPDATA', ''), '/Mozilla/Firefox/Profiles/*.default/cookies.sqlite'))
+                           glob.glob(os.path.join(os.getenv('APPDATA', ''), 'Mozilla/Firefox/Profiles/*.default/cookies.sqlite'))
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
         if cookie_files:
