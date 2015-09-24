@@ -53,20 +53,21 @@ class Chrome:
             my_pass = keyring.get_password('Chrome Safe Storage', 'Chrome')
             my_pass = my_pass.encode('utf8')
             iterations = 1003
+            self.key = PBKDF2(my_pass, salt, length, iterations)
             cookie_file = cookie_file or os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Cookies')
 
         elif sys.platform.startswith('linux'):
             # running Chrome on Linux
             my_pass = 'peanuts'.encode('utf8')
             iterations = 1
+            self.key = PBKDF2(my_pass, salt, length, iterations)
             cookie_file = cookie_file or os.path.expanduser('~/.config/google-chrome/Default/Cookies') or \
                                          os.path.expanduser('~/.config/chromium/Default/Cookies')
-
+        elif sys.platform == 'win32':
+            cookie_file = cookie_file or os.path.join(os.getenv('LOCALAPPDATA', ''), 'Google\Chrome\User Data\Default\Cookies')
         else:
-            # XXX need to add Chrome on Windows support 
-            raise BrowserCookieError("Currently only Chrome support for Linux and OSX.")
+            raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
 
-        self.key = PBKDF2(my_pass, salt, length, iterations)
         self.tmp_cookie_file = create_local_copy(cookie_file)
 
     def __del__(self):
@@ -96,23 +97,31 @@ class Chrome:
     def _decrypt(self, value, encrypted_value):
         """Decrypt encoded cookies
         """
-        if value or (encrypted_value[:3] != b'v10'):
-            return value
-    
-        # Encrypted cookies should be prefixed with 'v10' according to the 
-        # Chromium code. Strip it off.
-        encrypted_value = encrypted_value[3:]
- 
-        # Strip padding by taking off number indicated by padding
-        # eg if last is '\x0e' then ord('\x0e') == 14, so take off 14.
-        # You'll need to change this function to use ord() for python2.
-        def clean(x):
-            return x[:-ord(x[-1])].decode('utf8')
+        if (sys.platform == 'darwin') or sys.platform.startswith('linux'):
+            if value or (encrypted_value[:3] != b'v10'):
+                return value
+        
+            # Encrypted cookies should be prefixed with 'v10' according to the 
+            # Chromium code. Strip it off.
+            encrypted_value = encrypted_value[3:]
+     
+            # Strip padding by taking off number indicated by padding
+            # eg if last is '\x0e' then ord('\x0e') == 14, so take off 14.
+            # You'll need to change this function to use ord() for python2.
+            def clean(x):
+                return x[:-ord(x[-1])].decode('utf8')
 
-        iv = b' ' * 16
-        cipher = AES.new(self.key, AES.MODE_CBC, IV=iv)
-        decrypted = cipher.decrypt(encrypted_value)
-        return clean(decrypted)
+            iv = b' ' * 16
+            cipher = AES.new(self.key, AES.MODE_CBC, IV=iv)
+            decrypted = cipher.decrypt(encrypted_value)
+            return clean(decrypted)
+        else:
+            #Must be win32 (on win32, all chrome cookies are encrypted)
+            try:
+                import win32crypt
+            except ImportError:
+                raise BrowserCookieError('win32crypt must be available to decrypt Chrome cookie on Windows')
+            return win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1].decode("utf-8")
 
 
 
