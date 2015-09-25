@@ -64,7 +64,7 @@ class Chrome:
             cookie_file = cookie_file or os.path.expanduser('~/.config/google-chrome/Default/Cookies') or \
                                          os.path.expanduser('~/.config/chromium/Default/Cookies')
         elif sys.platform == 'win32':
-            cookie_file = cookie_file or os.path.join(os.getenv('LOCALAPPDATA', ''), 'Google\Chrome\User Data\Default\Cookies')
+            cookie_file = cookie_file or os.path.join(os.getenv('APPDATA', ''), '..\Local\Google\Chrome\User Data\Default\Cookies')
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
 
