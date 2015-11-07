@@ -46,6 +46,7 @@ def create_local_copy(cookie_file):
 
 class Chrome:
     def __init__(self, cookie_file=None):
+        self.tmp_cookie_file = None
         salt = b'saltysalt'
         length = 16
         if sys.platform == 'darwin':
@@ -72,7 +73,8 @@ class Chrome:
 
     def __del__(self):
         # remove temporary backup of sqlite cookie database
-        os.remove(self.tmp_cookie_file)
+        if self.tmp_cookie_file:
+            os.remove(self.tmp_cookie_file)
 
     def __str__(self):
         return 'chrome'
@@ -127,6 +129,7 @@ class Chrome:
 
 class Firefox:
     def __init__(self, cookie_file=None):
+        self.tmp_cookie_file = None
         cookie_file = cookie_file or self.find_cookie_file()
         self.tmp_cookie_file = create_local_copy(cookie_file)
         # current sessions are saved in sessionstore.js
@@ -134,7 +137,8 @@ class Firefox:
            
     def __del__(self):
         # remove temporary backup of sqlite cookie database
-        os.remove(self.tmp_cookie_file)
+        if self.tmp_cookie_file:
+            os.remove(self.tmp_cookie_file)
 
     def __str__(self):
         return 'firefox'
