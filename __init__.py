@@ -177,7 +177,7 @@ class Firefox(BrowserCookieLoader):
                 con.close()
 
                 # current sessions are saved in sessionstore.js
-                session_file = os.path.join(os.path.dirname(cookie_file),'sessionstore-backups', 'recovery.js')
+                session_file = os.path.join(os.path.dirname(cookie_file), 'sessionstore.js')
                 if os.path.exists(session_file):
                     try:
                         json_data = json.loads(open(session_file, 'rb').read())
