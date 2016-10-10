@@ -20,8 +20,6 @@ the FireFox database. An updated version of sqlite can be installed with:
 
         pip install pysqlite
 
-Note only Python 2 is supported currently.
-
 Usage
 -----
 
@@ -53,6 +51,15 @@ Bitbucket in Firefox before trying this example:
     >>> login_html = opener.open(url).read()
     >>> get_title(login_html)
     'richardpenman / home &mdash; Bitbucket'
+
+Differences with Python3:
+
+.. sourcecode:: python
+ 
+    >>> import urllib.request
+    >>> public_html = urllib.request.urlopen(url).read()
+    >>> opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+
 
 You should see your own username here, meaning the module successfully
 loaded the cookies from Firefox.

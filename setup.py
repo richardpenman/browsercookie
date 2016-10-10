@@ -2,13 +2,9 @@ import sys
 import os
 from distutils.core import setup
 
-if sys.version_info.major >= 3:
-    print 'Sorry, currently only supports Python 2. Patches welcome!'
-    sys.exit(1)
-
 setup(
     name='browsercookie', 
-    version='0.6.3',
+    version='0.7.0',
     packages=['browsercookie'],
     package_dir={'browsercookie' : '.'}, # look for package contents in current directory
     author='Richard Penman',
