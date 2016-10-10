@@ -5,7 +5,10 @@ import os
 import sys
 import time
 import glob
-import cookielib
+try:
+    import cookielib
+except ImportError:
+    import http.cookiejar as cookielib
 from contextlib import contextmanager
 import tempfile
 try:
@@ -128,9 +131,12 @@ class Chrome(BrowserCookieLoader):
 
             # Strip padding by taking off number indicated by padding
             # eg if last is '\x0e' then ord('\x0e') == 14, so take off 14.
-            # You'll need to change this function to use ord() for python2.
             def clean(x):
-                return x[:-ord(x[-1])].decode('utf8')
+                last = x[-1]
+                if isinstance(last, int):
+                    return x[:-last].decode('utf8')
+                else:
+                    return x[:-ord(last)].decode('utf8')
 
             iv = b' ' * 16
             cipher = AES.new(key, AES.MODE_CBC, IV=iv)
@@ -180,16 +186,16 @@ class Firefox(BrowserCookieLoader):
                 session_file = os.path.join(os.path.dirname(cookie_file), 'sessionstore.js')
                 if os.path.exists(session_file):
                     try:
-                        json_data = json.loads(open(session_file, 'rb').read())
+                        json_data = json.loads(open(session_file, 'rb').read().decode('utf-8'))
                     except ValueError as e:
-                        print 'Error parsing firefox session JSON:', str(e)
+                        print('Error parsing firefox session JSON:', str(e))
                     else:
                         expires = str(int(time.time()) + 3600 * 24 * 7)
                         for window in json_data.get('windows', []):
                             for cookie in window.get('cookies', []):
                                 yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
                 else:
-                    print 'Firefox session filename does not exist:', session_file
+                    print('Firefox session filename does not exist:', session_file)
 
 
 def create_cookie(host, path, secure, expires, name, value):
