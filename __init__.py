@@ -16,6 +16,11 @@ try:
 except ImportError:
     import simplejson as json
 try:
+    import ConfigParser as configparser
+except ImportError:
+    import configparser
+
+try:
     # should use pysqlite2 to read the cookies.sqlite on Windows
     # otherwise will raise the "sqlite3.DatabaseError: file is encrypted or is not a database" exception
     from pysqlite2 import dbapi2 as sqlite3
@@ -25,7 +30,6 @@ except ImportError:
 import keyring
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
-
 
 class BrowserCookieError(Exception):
     pass
@@ -155,17 +159,41 @@ class Firefox(BrowserCookieLoader):
     def __str__(self):
         return 'firefox'
 
-    def find_cookie_files(self):
+    def parse_profile(self, profile):
+        cp = configparser.SafeConfigParser()
+        cp.read(profile)
+        for section in cp.sections():
+            if cp.has_option(section, 'Default'):
+                try:
+                    if cp.getboolean(section, 'IsRelative'):
+                        path = os.path.dirname(profile) + '/' + cp.get(section, 'Path')
+                    else:
+                        path = cp.get(section, 'Path')
+                    return os.path.abspath(os.path.expanduser(path))
+                except configparser.NoOptionError:
+                    pass
+        raise BrowserCookieError('No default Firefox profile found')
+
+    def find_default_profile(self):
         if sys.platform == 'darwin':
-            cookie_files = glob.glob(os.path.expanduser('~/Library/Application Support/Firefox/Profiles/*.default/cookies.sqlite'))
+            return glob.glob(os.path.expanduser('~/Library/Application Support/Firefox/profiles.ini'))
         elif sys.platform.startswith('linux'):
-            cookie_files = glob.glob(os.path.expanduser('~/.mozilla/firefox/*.default*/cookies.sqlite'))
+            return glob.glob(os.path.expanduser('~/.mozilla/firefox/profiles.ini'))
         elif sys.platform == 'win32':
-            cookie_files = glob.glob(os.path.join(os.getenv('PROGRAMFILES', ''), 'Mozilla Firefox/profile/cookies.sqlite')) or \
-                           glob.glob(os.path.join(os.getenv('PROGRAMFILES(X86)', ''), 'Mozilla Firefox/profile/cookies.sqlite')) or \
-                           glob.glob(os.path.join(os.getenv('APPDATA', ''), 'Mozilla/Firefox/Profiles/*.default/cookies.sqlite'))
+            return glob.glob(os.path.join(os.getenv('PROGRAMFILES', ''), 'Mozilla Firefox/profiles.ini')) or \
+                   glob.glob(os.path.join(os.getenv('PROGRAMFILES(X86)', ''), 'Mozilla Firefox/profiles.ini')) or \
+                   glob.glob(os.path.join(os.getenv('APPDATA', ''), 'Mozilla/Firefox/Profiles/profiles.ini'))
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
+
+    def find_cookie_files(self):
+        profile = self.find_default_profile()
+        if not profile:
+            raise BrowserCookieError('Could not find default Firefox profile')
+        path = self.parse_profile(profile[0])
+        if not path:
+            raise BrowserCookieError('Could not find path to default Firefox profile')
+        cookie_files = glob.glob(os.path.expanduser(path + '/cookies.sqlite'))
         if cookie_files:
             return cookie_files
         else:
