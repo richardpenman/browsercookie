@@ -180,9 +180,7 @@ class Firefox(BrowserCookieLoader):
         elif sys.platform.startswith('linux'):
             return glob.glob(os.path.expanduser('~/.mozilla/firefox/profiles.ini'))
         elif sys.platform == 'win32':
-            return glob.glob(os.path.join(os.getenv('PROGRAMFILES', ''), 'Mozilla Firefox/profiles.ini')) or \
-                   glob.glob(os.path.join(os.getenv('PROGRAMFILES(X86)', ''), 'Mozilla Firefox/profiles.ini')) or \
-                   glob.glob(os.path.join(os.getenv('APPDATA', ''), 'Mozilla/Firefox/Profiles/profiles.ini'))
+            return glob.glob(os.path.join(os.getenv('APPDATA', ''), 'Mozilla/Firefox/profiles.ini'))
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
 
