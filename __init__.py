@@ -163,15 +163,14 @@ class Firefox(BrowserCookieLoader):
         cp = configparser.SafeConfigParser()
         cp.read(profile)
         for section in cp.sections():
-            if cp.has_option(section, 'Default'):
-                try:
-                    if cp.getboolean(section, 'IsRelative'):
-                        path = os.path.dirname(profile) + '/' + cp.get(section, 'Path')
-                    else:
-                        path = cp.get(section, 'Path')
-                    return os.path.abspath(os.path.expanduser(path))
-                except configparser.NoOptionError:
-                    pass
+            try:
+                if cp.getboolean(section, 'IsRelative'):
+                    path = os.path.dirname(profile) + '/' + cp.get(section, 'Path')
+                else:
+                    path = cp.get(section, 'Path')
+                return os.path.abspath(os.path.expanduser(path))
+            except configparser.NoOptionError:
+                pass
         raise BrowserCookieError('No default Firefox profile found')
 
     def find_default_profile(self):
