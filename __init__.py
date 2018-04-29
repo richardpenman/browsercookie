@@ -115,7 +115,12 @@ class Chrome(BrowserCookieLoader):
             with create_local_copy(cookie_file) as tmp_cookie_file:
                 con = sqlite3.connect(tmp_cookie_file)
                 cur = con.cursor()
-                cur.execute('SELECT host_key, path, secure, expires_utc, name, value, encrypted_value FROM cookies;')
+                cur.execute('SELECT value FROM meta WHERE key = "version";')
+                version = int(cur.fetchone()[0])
+                query = 'SELECT host_key, path, is_secure, expires_utc, name, value, encrypted_value FROM cookies;'
+                if version < 10:
+                    query = query.replace('is_', '')
+                cur.execute(query)
                 for item in cur.fetchall():
                     host, path, secure, expires, name = item[:5]
                     value = self._decrypt(item[5], item[6], key=key)
