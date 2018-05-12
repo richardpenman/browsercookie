@@ -27,6 +27,9 @@ try:
 except ImportError:
     import sqlite3
 
+import lz4
+
+
 import keyring
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
@@ -216,20 +219,38 @@ class Firefox(BrowserCookieLoader):
                     yield create_cookie(*item)
                 con.close()
 
-                # current sessions are saved in sessionstore.js
-                session_file = os.path.join(os.path.dirname(cookie_file), 'sessionstore.js')
-                if os.path.exists(session_file):
-                    try:
-                        json_data = json.loads(open(session_file, 'rb').read().decode('utf-8'))
-                    except ValueError as e:
-                        print('Error parsing firefox session JSON:', str(e))
-                    else:
-                        expires = str(int(time.time()) + 3600 * 24 * 7)
-                        for window in json_data.get('windows', []):
-                            for cookie in window.get('cookies', []):
-                                yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
+                # current sessions are saved in sessionstore.js/recovery.json/recovery.jsonlz4
+                session_files = (os.path.join(os.path.dirname(cookie_file), 'sessionstore.js'),
+                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
+                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'))
+                for file_path in session_files:
+                    if os.path.exists(file_path):
+                        if file_path.endswith('4'):
+                            try:
+                                session_file = open(file_path, 'rb')
+                                # skip the first 8 bits to avoid decompress failure (custom Mozilla header)
+                                session_file.seek(8)
+                                json_data = json.loads(lz4.block.decompress(session_file.read()))
+                            except IOError as e:
+                                print('Could not read file:', str(e))                               
+                            except ValueError as e:
+                                print('Error parsing firefox session file:', str(e))
+                        else:
+                            try:                        
+                                json_data = json.loads(open(file_path, 'rb').read().decode('utf-8'))
+                            except IOError as e:
+                                print('Could not read file:', str(e)) 
+                            except ValueError as e:
+                                print('Error parsing firefox session JSON:', str(e))                                           
+
+                if 'json_data' in locals():
+                    expires = str(int(time.time()) + 3600 * 24 * 7)
+                    for window in json_data.get('windows', []):
+                        for cookie in window.get('cookies', []):
+                            yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
                 else:
-                    print('Firefox session filename does not exist:', session_file)
+                    print('Could not find any Firefox session files') 
+                
 
 
 def create_cookie(host, path, secure, expires, name, value):
