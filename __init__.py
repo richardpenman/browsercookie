@@ -84,11 +84,14 @@ class Chrome(BrowserCookieLoader):
     def find_cookie_files(self):
         for pattern in [
             os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Vivaldi/Default/Cookies'),
             os.path.expanduser('~/.config/chromium/Default/Cookies'),
             os.path.expanduser('~/.config/chromium/Profile */Cookies'),
             os.path.expanduser('~/.config/google-chrome/Default/Cookies'),
             os.path.expanduser('~/.config/google-chrome/Profile */Cookies'),
+            os.path.expanduser('~/.config/vivaldi/Default/Cookies'),
             os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Cookies'),
+            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Default\Cookies'),            
         ]:
             for result in glob.glob(pattern):
                 yield result
