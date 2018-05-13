@@ -231,13 +231,13 @@ class Firefox(BrowserCookieLoader):
                         if file_path.endswith('4'):
                             try:
                                 session_file = open(file_path, 'rb')
-                                # skip the first 8 bits to avoid decompress failure (custom Mozilla header)
+                                # skip the first 8 bytes to avoid decompress failure (custom Mozilla header)
                                 session_file.seek(8)
                                 json_data = json.loads(lz4.block.decompress(session_file.read()))
                             except IOError as e:
                                 print('Could not read file:', str(e))                               
                             except ValueError as e:
-                                print('Error parsing firefox session file:', str(e))
+                                print('Error parsing Firefox session file:', str(e))
                         else:
                             try:                        
                                 json_data = json.loads(open(file_path, 'rb').read().decode('utf-8'))
