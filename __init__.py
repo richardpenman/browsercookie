@@ -27,9 +27,7 @@ try:
 except ImportError:
     import sqlite3
 
-import lz4
-
-
+import lz4.block
 import keyring
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
@@ -158,7 +156,7 @@ class Chrome(BrowserCookieLoader):
             decrypted = cipher.decrypt(encrypted_value)
             return clean(decrypted)
         else:
-            #Must be win32 (on win32, all chrome cookies are encrypted)
+            # Must be win32 (on win32, all chrome cookies are encrypted)
             try:
                 import win32crypt
             except ImportError:
