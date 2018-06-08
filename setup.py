@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name='browsercookie', 
-    version='0.7.4',
+    version='0.7.5',
     packages=['browsercookie'],
     package_dir={'browsercookie' : '.'}, # look for package contents in current directory
     author='Richard Penman',
