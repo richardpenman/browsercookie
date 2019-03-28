@@ -82,14 +82,19 @@ class Chrome(BrowserCookieLoader):
     def find_cookie_files(self):
         for pattern in [
             os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Google/Chrome/Profile */Cookies'),
             os.path.expanduser('~/Library/Application Support/Vivaldi/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Vivaldi/Profile */Cookies'),
             os.path.expanduser('~/.config/chromium/Default/Cookies'),
             os.path.expanduser('~/.config/chromium/Profile */Cookies'),
             os.path.expanduser('~/.config/google-chrome/Default/Cookies'),
             os.path.expanduser('~/.config/google-chrome/Profile */Cookies'),
             os.path.expanduser('~/.config/vivaldi/Default/Cookies'),
+            os.path.expanduser('~/.config/vivaldi/Profile */Cookies'),
             os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Default\Cookies'),            
+            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Profile *\Cookies'),
+            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Default\Cookies'),
+            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Profile *\Cookies'),
         ]:
             for result in glob.glob(pattern):
                 yield result
@@ -234,16 +239,16 @@ class Firefox(BrowserCookieLoader):
                                 session_file.seek(8)
                                 json_data = json.loads(lz4.block.decompress(session_file.read()).decode())
                             except IOError as e:
-                                print('Could not read file:', str(e))                               
+                                print('Could not read file:', str(e))
                             except ValueError as e:
                                 print('Error parsing Firefox session file:', str(e))
                         else:
-                            try:                        
+                            try:
                                 json_data = json.loads(open(file_path, 'rb').read().decode('utf-8'))
                             except IOError as e:
-                                print('Could not read file:', str(e)) 
+                                print('Could not read file:', str(e))
                             except ValueError as e:
-                                print('Error parsing firefox session JSON:', str(e))                                           
+                                print('Error parsing firefox session JSON:', str(e))
 
                 if 'json_data' in locals():
                     expires = str(int(time.time()) + 3600 * 24 * 7)
@@ -251,8 +256,8 @@ class Firefox(BrowserCookieLoader):
                         for cookie in window.get('cookies', []):
                             yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
                 else:
-                    print('Could not find any Firefox session files') 
-                
+                    print('Could not find any Firefox session files')
+
 
 
 def create_cookie(host, path, secure, expires, name, value):
