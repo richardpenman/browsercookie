@@ -19,6 +19,14 @@ try:
     import ConfigParser as configparser
 except ImportError:
     import configparser
+try:
+    # should use Cryptodome in windows instead of Crypto
+    # otherwise will raise an import error
+    from Cryptodome.Protocol.KDF import PBKDF2
+    from Cryptodome.Cipher import AES
+except ImportError:
+    from Crypto.Protocol.KDF import PBKDF2
+    from Crypto.Cipher import AES
 
 try:
     # should use pysqlite2 to read the cookies.sqlite on Windows
@@ -27,10 +35,15 @@ try:
 except ImportError:
     import sqlite3
 
+if sys.platform == 'darwin': # darwin is OSX
+    from struct import unpack
+    try:
+        from StringIO import StringIO # only works for python2
+    except ImportError:
+        from io import BytesIO as StringIO # only works for python3
+
 import lz4.block
 import keyring
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Cipher import AES
 
 class BrowserCookieError(Exception):
     pass
@@ -38,7 +51,8 @@ class BrowserCookieError(Exception):
 
 @contextmanager
 def create_local_copy(cookie_file):
-    """Make a local copy of the sqlite cookie database and return the new filename.
+    """
+    Make a local copy of the sqlite cookie database and return the new filename.
     This is necessary in case this database is still being written to while the user browses
     to avoid sqlite locking errors.
     """
@@ -258,6 +272,120 @@ class Firefox(BrowserCookieLoader):
                 else:
                     print('Could not find any Firefox session files')
 
+class Safari(BrowserCookieLoader):
+    def __str__(self):
+        return 'safari'
+
+    def find_cookie_files(self):
+        if (sys.platform != 'darwin'):  # checks if using OSX
+            BrowserCookieError('Safari is only available on OSX')
+        else:
+            cookie_files = glob.glob(os.path.expanduser('~/Library/Cookies')) # no actual use of cookie files because we only have need one specific cookie file
+            if cookie_files:
+                return cookie_files
+            else:
+                raise BrowserCookieError('Failed to find Safari cookies')
+
+    def get_cookies(self):
+        FilePath = os.path.expanduser('~/Library/Cookies/Cookies.binarycookies')
+
+        try:
+            binary_file = open(FilePath, 'rb')
+        except IOError as e:
+            BrowserCookieError('File Not Found :' + FilePath)
+            exit()
+
+        file_header = binary_file.read(4)# will equal 'cook', which stands for cookies
+
+        num_pages = unpack('>i', binary_file.read(4))[0]
+
+        page_sizes = []
+        for np in range(num_pages):
+            page_sizes.append(unpack('>i', binary_file.read(4))[0])
+
+        pages = []
+        for ps in page_sizes:
+            pages.append(binary_file.read(ps))
+
+        for page in pages:
+            page = StringIO(page)
+            page.read(4)
+            num_cookies = unpack('<i', page.read(4))[
+                0]
+
+            cookie_offsets = []
+            for nc in range(num_cookies):
+                cookie_offsets.append(unpack('<i', page.read(4))[
+                                          0])
+
+            page.read(4)
+
+            cookie = ''
+            for offset in cookie_offsets:
+                page.seek(offset)
+                cookiesize = unpack('<i', page.read(4))[0]
+                cookie = StringIO(page.read(cookiesize))
+
+                cookie.read(4)
+
+                flags = unpack('<i', cookie.read(4))[0]
+                cookie_flags = ''
+                if flags == 0:
+                    cookie_flags = False # if nothing at all
+                if flags == 1:
+                    cookie_flags = True # if Secure
+                elif flags == 4:
+                    cookie_flags = False # if Http only
+                elif flags == 5:
+                    cookie_flags = True # if Secure and Http only
+                else:
+                    cookie_flags = False # if Unknown
+
+                cookie.read(4)
+
+                urloffset = unpack('<i', cookie.read(4))[0]
+                nameoffset = unpack('<i', cookie.read(4))[0]
+                pathoffset = unpack('<i', cookie.read(4))[0]
+                valueoffset = unpack('<i', cookie.read(4))[0]
+
+                expiry_date = str(int(unpack('<d', cookie.read(8))[0] + 978307200)) # 978307200 because mac's time starts at: 2001, 1, 1
+
+                # create_date = str(int(unpack('<d', cookie.read(8))[0] + 978307200)) no need of it here...
+
+                # endofcookie = cookie.read(8) no need it either...
+
+                cookie.seek(urloffset - 4)
+                host = ''
+                u = cookie.read(1)
+                while unpack('<b', u)[0] != 0:
+                    host = host + u.decode("utf-8") # in bytes have to be decoded
+                    u = cookie.read(1)
+
+                cookie.seek(nameoffset - 4)
+                name = ''
+                n = cookie.read(1)
+                while unpack('<b', n)[0] != 0:
+                    name = name + n.decode("utf-8")
+                    n = cookie.read(1)
+
+                cookie.seek(pathoffset - 4)
+                path = ''
+                pa = cookie.read(1)
+                while unpack('<b', pa)[0] != 0:
+                    path = path + pa.decode("utf-8")
+                    pa = cookie.read(1)
+
+                cookie.seek(valueoffset - 4)
+                value = ''
+                va = cookie.read(1)
+                while unpack('<b', va)[0] != 0:
+                    value = value + va.decode("utf-8")
+                    va = cookie.read(1)
+
+                yield create_cookie(host, path, cookie_flags, expiry_date, name, value)
+
+        binary_file.close()
+
 
 
 def create_cookie(host, path, secure, expires, name, value):
@@ -265,18 +393,20 @@ def create_cookie(host, path, secure, expires, name, value):
     """
     return cookielib.Cookie(0, name, value, None, False, host, host.startswith('.'), host.startswith('.'), path, True, secure, expires, False, None, None, {})
 
-
 def chrome(cookie_file=None):
     """Returns a cookiejar of the cookies used by Chrome
     """
     return Chrome(cookie_file).load()
-
 
 def firefox(cookie_file=None):
     """Returns a cookiejar of the cookies and sessions used by Firefox
     """
     return Firefox(cookie_file).load()
 
+def safari(cookie_file=None):
+    """Returns a cookiejar of the cookies used by safari
+    """
+    return Safari(cookie_file).load()
 
 def _get_cookies():
     '''Return all cookies from all browsers'''
@@ -286,7 +416,6 @@ def _get_cookies():
                 yield cookie
         except BrowserCookieError:
             pass
-
 
 def load():
     """Try to load cookies from all supported browsers and return combined cookiejar
