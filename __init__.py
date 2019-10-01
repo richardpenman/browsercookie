@@ -291,16 +291,16 @@ class Safari(BrowserCookieLoader):
 
         try:
             binary_file = open(FilePath, 'rb')
-        except IOError as e:
+        except IOError:
             BrowserCookieError('File Not Found :' + FilePath)
             exit()
 
-        file_header = binary_file.read(4)# will equal 'cook', which stands for cookies
+        binary_file.read(4)# will equal 'cook', which stands for cookies
 
         num_pages = unpack('>i', binary_file.read(4))[0]
 
         page_sizes = []
-        for np in range(num_pages):
+        for _ in range(num_pages):
             page_sizes.append(unpack('>i', binary_file.read(4))[0])
 
         pages = []
@@ -310,13 +310,11 @@ class Safari(BrowserCookieLoader):
         for page in pages:
             page = StringIO(page)
             page.read(4)
-            num_cookies = unpack('<i', page.read(4))[
-                0]
+            num_cookies = unpack('<i', page.read(4))[0]
 
             cookie_offsets = []
-            for nc in range(num_cookies):
-                cookie_offsets.append(unpack('<i', page.read(4))[
-                                          0])
+            for _ in range(num_cookies):
+                cookie_offsets.append(unpack('<i', page.read(4))[0])
 
             page.read(4)
 
