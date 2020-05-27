@@ -5,6 +5,11 @@ import os
 import sys
 import time
 import glob
+import base64
+import win32crypt
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+
 try:
     import cookielib
 except ImportError:
@@ -130,7 +135,13 @@ class Chrome(BrowserCookieLoader):
             key = PBKDF2(my_pass, salt, length, iterations)
 
         elif sys.platform == 'win32':
-            key = None
+            path = r'%LocalAppData%\Google\Chrome\User Data\Local State'
+            path = os.path.expandvars(path)
+            with open(path, 'r') as file:
+                encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
+            encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
+            encrypted_key = encrypted_key[5:]  # Remove DPAPI
+            key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
 
@@ -146,11 +157,12 @@ class Chrome(BrowserCookieLoader):
                 cur.execute(query)
                 for item in cur.fetchall():
                     host, path, secure, expires, name = item[:5]
-                    value = self._decrypt(item[5], item[6], key=key)
+                    value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
                     yield create_cookie(host, path, secure, expires, name, value)
                 con.close()
 
-    def _decrypt(self, value, encrypted_value, key):
+    def _decrypt(self, value, encrypted_value, cookiename, sitename, key):
+
         """Decrypt encoded cookies
         """
         if (sys.platform == 'darwin') or sys.platform.startswith('linux'):
@@ -176,11 +188,24 @@ class Chrome(BrowserCookieLoader):
             return clean(decrypted)
         else:
             # Must be win32 (on win32, all chrome cookies are encrypted)
-            try:
-                import win32crypt
-            except ImportError:
-                raise BrowserCookieError('win32crypt must be available to decrypt Chrome cookie on Windows')
-            return win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1].decode("utf-8")
+
+            plaintext = ""
+            if encrypted_value[:3] == b'v10':
+                try:
+                    data = encrypted_value # the encrypted cookie
+                    nonce = data[3:3 + 12]
+                    ciphertext = data[3 + 12:-16]
+                    tag = data[-16:]
+                    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+                    plaintext = cipher.decrypt_and_verify(ciphertext, tag).decode("utf-8")  # the decrypted cookie
+                except:
+                    raise BrowserCookieError("Error decrypting V80+ cookie: " + str(cookiename) + " from site " + str(sitename))
+            else:
+                try:
+                    plaintext = win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1].decode("utf-8")
+                except:
+                    raise BrowserCookieError("Error decrypting cookie: " + str(cookiename) + " from site " + str(sitename))
+            return plaintext
 
 
 class Firefox(BrowserCookieLoader):
