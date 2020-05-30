@@ -6,7 +6,7 @@ import sys
 import time
 import glob
 import base64
-import win32crypt
+from win32 import win32crypt #pywin32
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
