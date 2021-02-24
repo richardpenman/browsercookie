@@ -6,9 +6,9 @@ import sys
 import time
 import glob
 import base64
-from win32 import win32crypt #pywin32
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
+
+if sys.platform == 'win32':
+    from win32 import win32crypt #pywin32
 
 try:
     import cookielib
@@ -131,6 +131,18 @@ class Chrome(BrowserCookieLoader):
         elif sys.platform.startswith('linux'):
             # running Chrome on Linux
             my_pass = 'peanuts'.encode('utf8')
+            try:
+                import secretstorage
+
+                bus = secretstorage.dbus_init()
+                collection = secretstorage.get_default_collection(bus)
+                for item in collection.get_all_items():
+                    if item.get_label() in ['Chromium Safe Storage', 'Chrome Safe Storage']:
+                        my_pass = item.get_secret()
+                        break
+            except Exception as e:
+                print(e)
+
             iterations = 1
             key = PBKDF2(my_pass, salt, length, iterations)
 
@@ -166,10 +178,10 @@ class Chrome(BrowserCookieLoader):
         """Decrypt encoded cookies
         """
         if (sys.platform == 'darwin') or sys.platform.startswith('linux'):
-            if value or (encrypted_value[:3] != b'v10'):
+            if value or (encrypted_value[:3] != b'v10' and encrypted_value[:3] != b'v11'):
                 return value
 
-            # Encrypted cookies should be prefixed with 'v10' according to the
+            # Encrypted cookies should be prefixed with 'v10' or 'v11' according to the
             # Chromium code. Strip it off.
             encrypted_value = encrypted_value[3:]
 
