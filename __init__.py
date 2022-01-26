@@ -291,7 +291,7 @@ class Firefox(BrowserCookieLoader):
 
                 if 'json_data' in locals():
                     expires = str(int(time.time()) + 3600 * 24 * 7)
-                    for window in json_data.get('windows', []):
+                    for window in json_data.get('windows', []) + [json_data]:
                         for cookie in window.get('cookies', []):
                             yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
                 else:
