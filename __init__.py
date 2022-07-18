@@ -170,6 +170,7 @@ class Chrome(BrowserCookieLoader):
                 cur.execute(query)
                 for item in cur.fetchall():
                     host, path, secure, expires, name = item[:5]
+                    expires = expires /1e6  - 11644473600 # 1601/1/1
                     value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
                     yield create_cookie(host, path, secure, expires, name, value)
                 con.close()
