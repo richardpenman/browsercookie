@@ -113,6 +113,7 @@ class Chrome(BrowserCookieLoader):
             os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Cookies'),
             os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Network\Cookies'),
             os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Profile *\Cookies'),
+            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Profile *\Network\Cookies'),
             os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Default\Cookies'),
             os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Profile *\Cookies'),
         ]:
