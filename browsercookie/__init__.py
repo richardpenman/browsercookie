@@ -304,6 +304,7 @@ class Firefox(BrowserCookieLoader):
                                  os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.js'),
                                  os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
                                  os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'))
+                json_data = None
                 for file_path in session_files:
                     if os.path.exists(file_path):
                         if file_path.endswith('4'):
@@ -324,7 +325,7 @@ class Firefox(BrowserCookieLoader):
                             except ValueError as e:
                                 print('Error parsing firefox session JSON:', str(e))
 
-                if 'json_data' in locals():
+                if json_data is not None:
                     expires = str(int(time.time()) + 3600 * 24 * 7)
                     for window in json_data.get('windows', []) + [json_data]:
                         for cookie in window.get('cookies', []):
