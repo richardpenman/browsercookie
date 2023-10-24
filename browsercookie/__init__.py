@@ -299,9 +299,11 @@ class Firefox(BrowserCookieLoader):
 
                 # current sessions are saved in sessionstore.js/recovery.json/recovery.jsonlz4
                 session_files = (os.path.join(os.path.dirname(cookie_file), 'sessionstore.js'),
-                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.js'),
-                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
-                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'))
+                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore.json'),
+                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore.jsonlz4'),
+                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.js'),
+                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
+                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'))
                 for file_path in session_files:
                     if os.path.exists(file_path):
                         if file_path.endswith('4'):
