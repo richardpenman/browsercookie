@@ -430,20 +430,20 @@ def create_cookie(host, path, secure, expires, name, value):
     """
     return cookielib.Cookie(0, name, value, None, False, host, host.startswith('.'), host.startswith('.'), path, True, secure, expires, False, None, None, {})
 
-def chrome(cookie_file=None):
+def chrome(cookie_files=None):
     """Returns a cookiejar of the cookies used by Chrome
     """
-    return Chrome(cookie_file).load()
+    return Chrome(cookie_files).load()
 
-def firefox(cookie_file=None):
+def firefox(cookie_files=None):
     """Returns a cookiejar of the cookies and sessions used by Firefox
     """
-    return Firefox(cookie_file).load()
+    return Firefox(cookie_files).load()
 
-def safari(cookie_file=None):
+def safari(cookie_files=None):
     """Returns a cookiejar of the cookies used by safari
     """
-    return Safari(cookie_file).load()
+    return Safari(cookie_files).load()
 
 def _get_cookies():
     '''Return all cookies from all browsers'''
