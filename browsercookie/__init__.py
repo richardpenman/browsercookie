@@ -89,7 +89,7 @@ class BrowserCookieLoader(object):
     def load(self):
         '''Load cookies into a cookiejar'''
         cookie_jar = cookielib.CookieJar()
-        for cookie in self.get_cookies():
+        for cookie in sorted(self.get_cookies(), key=lambda cookie: cookie.expires):
             cookie_jar.set_cookie(cookie)
         return cookie_jar
 
