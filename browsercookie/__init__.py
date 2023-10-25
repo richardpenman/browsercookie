@@ -51,6 +51,7 @@ if sys.platform == 'darwin': # darwin is OSX
 import lz4.block
 import keyring
 
+
 class BrowserCookieError(Exception):
     pass
 
@@ -95,31 +96,7 @@ class BrowserCookieLoader(object):
         return cookie_jar
 
 
-class Chrome(BrowserCookieLoader):
-    def __str__(self):
-        return 'chrome'
-
-    def find_cookie_files(self):
-        for pattern in [
-            os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Cookies'),
-            os.path.expanduser('~/Library/Application Support/Google/Chrome/Profile */Cookies'),
-            os.path.expanduser('~/Library/Application Support/Vivaldi/Default/Cookies'),
-            os.path.expanduser('~/Library/Application Support/Vivaldi/Profile */Cookies'),
-            os.path.expanduser('~/.config/chromium/Default/Cookies'),
-            os.path.expanduser('~/.config/chromium/Profile */Cookies'),
-            os.path.expanduser('~/.config/google-chrome/Default/Cookies'),
-            os.path.expanduser('~/.config/google-chrome/Profile */Cookies'),
-            os.path.expanduser('~/.config/vivaldi/Default/Cookies'),
-            os.path.expanduser('~/.config/vivaldi/Profile */Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Network\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Profile *\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Default\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Profile *\Cookies'),
-        ]:
-            for result in glob.glob(pattern):
-                yield result
-
+class ChromeBased(BrowserCookieLoader):
     def get_cookies(self):
         salt = b'saltysalt'
         length = 16
@@ -178,7 +155,7 @@ class Chrome(BrowserCookieLoader):
                 cur.execute(query)
                 for item in cur.fetchall():
                     host, path, secure, expires, name = item[:5]
-                    expires = expires /1e6  - 11644473600 # 1601/1/1
+                    expires = expires / 1e6 - 11644473600  # 1601/1/1
                     value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
                     yield create_cookie(host, path, secure, expires, name, value)
                 con.close()
@@ -228,6 +205,96 @@ class Chrome(BrowserCookieLoader):
                 except:
                     raise BrowserCookieError("Error decrypting cookie: " + str(cookiename) + " from site " + str(sitename))
             return plaintext
+
+
+class Chrome(ChromeBased):
+    def __str__(self):
+        return 'chrome'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Google/Chrome/Profile */Cookies'),
+            os.path.expanduser('~/.config/google-chrome/Default/Cookies'),
+            os.path.expanduser('~/.config/google-chrome/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chrome\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chrome\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chrome\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class Chromium(ChromeBased):
+    def __str__(self):
+        return 'chromium'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Google/Chromium/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Google/Chromium/Profile */Cookies'),
+            os.path.expanduser('~/.config/chromium/Default/Cookies'),
+            os.path.expanduser('~/.config/chromium/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chromium\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chromium\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chromium\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class Vivaldi(ChromeBased):
+    def __str__(self):
+        return 'vivaldi'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Vivaldi/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Vivaldi/Profile */Cookies'),
+            os.path.expanduser('~/.config/vivaldi/Default/Cookies'),
+            os.path.expanduser('~/.config/vivaldi/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Vivaldi\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Vivaldi\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Vivaldi\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class Edge(ChromeBased):
+    def __str__(self):
+        return 'edge'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge/Profile */Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge/Default/Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class EdgeDev(ChromeBased):
+    def __str__(self):
+        return 'edge-dev'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge Dev/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge Dev/Profile */Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge-dev/Default/Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge-dev/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge Dev\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge Dev\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge Dev\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
 
 
 class Firefox(BrowserCookieLoader):
@@ -332,6 +399,7 @@ class Firefox(BrowserCookieLoader):
                             yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
                 else:
                     print('Could not find any Firefox session files')
+
 
 class Safari(BrowserCookieLoader):
     def __str__(self):
@@ -452,29 +520,58 @@ def create_cookie(host, path, secure, expires, name, value):
     """
     return cookielib.Cookie(0, name, value, None, False, host, host.startswith('.'), host.startswith('.'), path, True, secure, expires, False, None, None, {})
 
+
 def chrome(cookie_files=None):
     """Returns a cookiejar of the cookies used by Chrome
     """
     return Chrome(cookie_files).load()
+
+
+def chromium(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Chromium
+    """
+    return Chromium(cookie_files).load()
+
+
+def vivaldi(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Vivaldi
+    """
+    return Vivaldi(cookie_files).load()
+
+
+def edge(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Microsoft Edge
+    """
+    return Edge(cookie_files).load()
+
+
+def edge_dev(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Microsoft Edge Dev
+    """
+    return EdgeDev(cookie_files).load()
+
 
 def firefox(cookie_files=None):
     """Returns a cookiejar of the cookies and sessions used by Firefox
     """
     return Firefox(cookie_files).load()
 
+
 def safari(cookie_files=None):
     """Returns a cookiejar of the cookies used by safari
     """
     return Safari(cookie_files).load()
 
+
 def _get_cookies():
     '''Return all cookies from all browsers'''
-    for klass in [Chrome, Firefox]:
+    for klass in [Chrome, Chromium, Vivaldi, Edge, EdgeDev, Firefox]:
         try:
             for cookie in klass().get_cookies():
                 yield cookie
         except BrowserCookieError:
             pass
+
 
 def load():
     """Try to load cookies from all supported browsers and return combined cookiejar
