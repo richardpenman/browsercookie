@@ -6,6 +6,7 @@ import sys
 import time
 import glob
 import base64
+from pathlib import Path
 
 if sys.platform == 'win32':
     from win32 import win32crypt #pywin32
@@ -148,17 +149,24 @@ class Chrome(BrowserCookieLoader):
             key = PBKDF2(my_pass, salt, length, iterations)
 
         elif sys.platform == 'win32':
-            path = r'%LocalAppData%\Google\Chrome\User Data\Local State'
-            path = os.path.expandvars(path)
-            with open(path, 'r') as file:
-                encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
-            encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
-            encrypted_key = encrypted_key[5:]  # Remove DPAPI
-            key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
+            # per-file encryption key location
+            pass
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
 
         for cookie_file in self.cookie_files:
+            if sys.platform == 'win32':
+                cookie_path = Path(cookie_file).absolute()
+                user_dir_path = next((p for p in cookie_path.parents if p.name == 'User Data'), None)
+                local_state_path = user_dir_path / 'Local State' if user_dir_path is not None else None
+                if local_state_path is None or not local_state_path.exists():
+                    raise BrowserCookieError('Failed to find Local State folder for cookie file ' + str(cookie_path))
+                with open(local_state_path, 'r') as file:
+                    encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
+                encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
+                encrypted_key = encrypted_key[5:]  # Remove DPAPI
+                key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
+
             with create_local_copy(cookie_file) as tmp_cookie_file:
                 con = sqlite3.connect(tmp_cookie_file)
                 cur = con.cursor()
