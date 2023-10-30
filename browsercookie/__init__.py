@@ -138,7 +138,7 @@ class ChromeBased(BrowserCookieLoader):
                 local_state_path = user_dir_path / 'Local State' if user_dir_path is not None else None
                 if local_state_path is None or not local_state_path.exists():
                     raise BrowserCookieError('Failed to find Local State folder for cookie file ' + str(cookie_path))
-                with open(local_state_path, 'r') as file:
+                with open(local_state_path, 'rb') as file:
                     encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
                 encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
                 encrypted_key = encrypted_key[5:]  # Remove DPAPI
