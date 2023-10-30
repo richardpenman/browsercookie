@@ -57,7 +57,7 @@ class BrowserCookieError(Exception):
 
 
 @contextmanager
-def create_local_copy(cookie_file):
+def create_local_copy(cookie_file, suffix='.sqlite'):
     """
     Make a local copy of the sqlite cookie database and return the new filename.
     This is necessary in case this database is still being written to while the user browses
@@ -66,7 +66,7 @@ def create_local_copy(cookie_file):
     # check if cookie file exists
     if os.path.exists(cookie_file):
         # copy to random name in tmp folder
-        tmp_cookie_file = tempfile.NamedTemporaryFile(suffix='.sqlite').name
+        tmp_cookie_file = tempfile.NamedTemporaryFile(suffix=suffix).name
         open(tmp_cookie_file, 'wb').write(open(cookie_file, 'rb').read())
         yield tmp_cookie_file
     else:
@@ -347,36 +347,41 @@ class Firefox(BrowserCookieLoader):
         path = self.parse_profile(profile[0])
         if not path:
             raise BrowserCookieError('Could not find path to default Firefox profile')
-        cookie_files = glob.glob(os.path.expanduser(path + '/cookies.sqlite'))
-        if cookie_files:
-            return cookie_files
+
+        cookie_file = os.path.expanduser(path + '/cookies.sqlite')
+        if os.path.exists(cookie_file):
+            for session_file in [
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.js'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore.js'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore.json'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore.jsonlz4'),
+            ]:
+                if os.path.exists(session_file):
+                    yield session_file
+            yield cookie_file
         else:
             raise BrowserCookieError('Failed to find Firefox cookies')
 
     def get_cookies(self):
+        has_session_files = False
         for cookie_file in self.cookie_files:
-            with create_local_copy(cookie_file) as tmp_cookie_file:
-                con = sqlite3.connect(tmp_cookie_file)
-                cur = con.cursor()
-                cur.execute('select host, path, isSecure, expiry, name, value from moz_cookies')
+            cookie_path = Path(cookie_file)
+            with create_local_copy(cookie_file, suffix=cookie_path.suffix) as tmp_cookie_file:
+                if cookie_path.suffix == '.sqlite':
+                    con = sqlite3.connect(tmp_cookie_file)
+                    cur = con.cursor()
+                    cur.execute('select host, path, isSecure, expiry, name, value from moz_cookies')
 
-                for item in cur.fetchall():
-                    yield create_cookie(*item)
-                con.close()
-
-                # current sessions are saved in sessionstore.js/recovery.json/recovery.jsonlz4
-                session_files = (os.path.join(os.path.dirname(cookie_file), 'sessionstore.js'),
-                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore.json'),
-                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore.jsonlz4'),
-                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.js'),
-                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
-                                 os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'))
-                json_data = None
-                for file_path in session_files:
-                    if os.path.exists(file_path):
-                        if file_path.endswith('4'):
+                    for item in cur.fetchall():
+                        yield create_cookie(*item)
+                    con.close()
+                else:
+                    json_data = None
+                    with open(tmp_cookie_file, 'rb') as session_file:
+                        if tmp_cookie_file.endswith('4'):
                             try:
-                                session_file = open(file_path, 'rb')
                                 # skip the first 8 bytes to avoid decompress failure (custom Mozilla header)
                                 session_file.seek(8)
                                 json_data = json.loads(lz4.block.decompress(session_file.read()).decode())
@@ -386,19 +391,20 @@ class Firefox(BrowserCookieLoader):
                                 print('Error parsing Firefox session file:', str(e))
                         else:
                             try:
-                                json_data = json.loads(open(file_path, 'rb').read().decode('utf-8'))
+                                json_data = json.loads(session_file.read().decode('utf-8'))
                             except IOError as e:
                                 print('Could not read file:', str(e))
                             except ValueError as e:
                                 print('Error parsing firefox session JSON:', str(e))
 
-                if json_data is not None:
-                    expires = str(int(time.time()) + 3600 * 24 * 7)
-                    for window in json_data.get('windows', []) + [json_data]:
-                        for cookie in window.get('cookies', []):
-                            yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
-                else:
-                    print('Could not find any Firefox session files')
+                    if json_data is not None:
+                        has_session_files = True
+                        expires = str(int(time.time()) + 3600 * 24 * 7)
+                        for window in json_data.get('windows', []) + [json_data]:
+                            for cookie in window.get('cookies', []):
+                                yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
+        if not has_session_files:
+            print('Could not find any Firefox session files')
 
 
 class Safari(BrowserCookieLoader):
