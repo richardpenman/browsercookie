@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 __doc__ = 'Load browser cookies into a cookiejar'
 
+import contextlib
 import os
 import sys
 import time
@@ -145,20 +146,19 @@ class ChromeBased(BrowserCookieLoader):
                 key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
 
             with create_local_copy(cookie_file) as tmp_cookie_file:
-                con = sqlite3.connect(tmp_cookie_file)
-                cur = con.cursor()
-                cur.execute('SELECT value FROM meta WHERE key = "version";')
-                version = int(cur.fetchone()[0])
-                query = 'SELECT host_key, path, is_secure, expires_utc, name, value, encrypted_value FROM cookies;'
-                if version < 10:
-                    query = query.replace('is_', '')
-                cur.execute(query)
-                for item in cur.fetchall():
-                    host, path, secure, expires, name = item[:5]
-                    expires = expires / 1e6 - 11644473600  # 1601/1/1
-                    value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
-                    yield create_cookie(host, path, secure, expires, name, value)
-                con.close()
+                with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
+                    cur = con.cursor()
+                    cur.execute('SELECT value FROM meta WHERE key = "version";')
+                    version = int(cur.fetchone()[0])
+                    query = 'SELECT host_key, path, is_secure, expires_utc, name, value, encrypted_value FROM cookies;'
+                    if version < 10:
+                        query = query.replace('is_', '')
+                    cur.execute(query)
+                    for item in cur.fetchall():
+                        host, path, secure, expires, name = item[:5]
+                        expires = expires / 1e6 - 11644473600  # 1601/1/1
+                        value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
+                        yield create_cookie(host, path, secure, expires, name, value)
 
     def _decrypt(self, value, encrypted_value, cookiename, sitename, key):
 
@@ -370,13 +370,12 @@ class Firefox(BrowserCookieLoader):
             cookie_path = Path(cookie_file)
             with create_local_copy(cookie_file, suffix=cookie_path.suffix) as tmp_cookie_file:
                 if cookie_path.suffix == '.sqlite':
-                    con = sqlite3.connect(tmp_cookie_file)
-                    cur = con.cursor()
-                    cur.execute('select host, path, isSecure, expiry, name, value from moz_cookies')
+                    with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
+                        cur = con.cursor()
+                        cur.execute('select host, path, isSecure, expiry, name, value from moz_cookies')
 
-                    for item in cur.fetchall():
-                        yield create_cookie(*item)
-                    con.close()
+                        for item in cur.fetchall():
+                            yield create_cookie(*item)
                 else:
                     json_data = None
                     with open(tmp_cookie_file, 'rb') as session_file:
