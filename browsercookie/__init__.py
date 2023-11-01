@@ -305,7 +305,7 @@ class Firefox(BrowserCookieLoader):
         profile_dir = Path(os.path.dirname(profile))
 
         cp = configparser.ConfigParser()
-        cp.read(profile)
+        cp.read(profile, encoding='utf-8')
 
         path = None
         for section in cp.sections():
