@@ -136,6 +136,7 @@ class ChromeBased(BrowserCookieLoader):
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
 
+        key_local_state_path = None
         for cookie_file in self.cookie_files:
             if sys.platform == 'win32':
                 cookie_path = Path(cookie_file).absolute()
@@ -143,11 +144,14 @@ class ChromeBased(BrowserCookieLoader):
                 local_state_path = user_dir_path / 'Local State' if user_dir_path is not None else None
                 if local_state_path is None or not local_state_path.exists():
                     raise BrowserCookieError('Failed to find Local State folder for cookie file ' + str(cookie_path))
-                with open(local_state_path, 'rb') as file:
-                    encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
-                encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
-                encrypted_key = encrypted_key[5:]  # Remove DPAPI
-                key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
+                if key_local_state_path != local_state_path:
+                    with open(local_state_path, 'rb') as file:
+                        encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
+                    encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
+                    encrypted_key = encrypted_key[5:]  # Remove DPAPI
+
+                    key_local_state_path = local_state_path
+                    key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
 
             with create_local_copy(cookie_file) as tmp_cookie_file:
                 with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
