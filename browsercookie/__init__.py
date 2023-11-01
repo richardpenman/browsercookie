@@ -58,22 +58,26 @@ class BrowserCookieError(Exception):
 
 
 @contextmanager
-def create_local_copy(cookie_file, suffix='.sqlite'):
+def create_local_copy(cookie_path, suffix='.sqlite'):
     """
     Make a local copy of the sqlite cookie database and return the new filename.
     This is necessary in case this database is still being written to while the user browses
     to avoid sqlite locking errors.
     """
     # check if cookie file exists
-    if os.path.exists(cookie_file):
+    if os.path.exists(cookie_path):
         # copy to random name in tmp folder
-        tmp_cookie_file = tempfile.NamedTemporaryFile(suffix=suffix).name
-        open(tmp_cookie_file, 'wb').write(open(cookie_file, 'rb').read())
-        yield tmp_cookie_file
+        tmp_cookie_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        tmp_cookie_path = tmp_cookie_file.name
+        try:
+            with contextlib.closing(tmp_cookie_file):
+                with open(cookie_path, 'rb') as cookie_file:
+                    tmp_cookie_file.write(cookie_file.read())
+            yield tmp_cookie_path
+        finally:
+            os.remove(tmp_cookie_path)
     else:
-        raise BrowserCookieError('Can not find cookie file at: ' + cookie_file)
-
-    os.remove(tmp_cookie_file)
+        raise BrowserCookieError('Can not find cookie file at: ' + cookie_path)
 
 
 class BrowserCookieLoader(object):
