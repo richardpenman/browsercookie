@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 __doc__ = 'Load browser cookies into a cookiejar'
 
+import contextlib
 import os
 import sys
 import time
 import glob
 import base64
+from pathlib import Path
 
 if sys.platform == 'win32':
     from win32 import win32crypt #pywin32
@@ -50,27 +52,32 @@ if sys.platform == 'darwin': # darwin is OSX
 import lz4.block
 import keyring
 
+
 class BrowserCookieError(Exception):
     pass
 
 
 @contextmanager
-def create_local_copy(cookie_file):
+def create_local_copy(cookie_path, suffix='.sqlite'):
     """
     Make a local copy of the sqlite cookie database and return the new filename.
     This is necessary in case this database is still being written to while the user browses
     to avoid sqlite locking errors.
     """
     # check if cookie file exists
-    if os.path.exists(cookie_file):
+    if os.path.exists(cookie_path):
         # copy to random name in tmp folder
-        tmp_cookie_file = tempfile.NamedTemporaryFile(suffix='.sqlite').name
-        open(tmp_cookie_file, 'wb').write(open(cookie_file, 'rb').read())
-        yield tmp_cookie_file
+        tmp_cookie_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        tmp_cookie_path = tmp_cookie_file.name
+        try:
+            with contextlib.closing(tmp_cookie_file):
+                with open(cookie_path, 'rb') as cookie_file:
+                    tmp_cookie_file.write(cookie_file.read())
+            yield tmp_cookie_path
+        finally:
+            os.remove(tmp_cookie_path)
     else:
-        raise BrowserCookieError('Can not find cookie file at: ' + cookie_file)
-
-    os.remove(tmp_cookie_file)
+        raise BrowserCookieError('Can not find cookie file at: ' + cookie_path)
 
 
 class BrowserCookieLoader(object):
@@ -89,36 +96,12 @@ class BrowserCookieLoader(object):
     def load(self):
         '''Load cookies into a cookiejar'''
         cookie_jar = cookielib.CookieJar()
-        for cookie in self.get_cookies():
+        for cookie in sorted(self.get_cookies(), key=lambda cookie: cookie.expires):
             cookie_jar.set_cookie(cookie)
         return cookie_jar
 
 
-class Chrome(BrowserCookieLoader):
-    def __str__(self):
-        return 'chrome'
-
-    def find_cookie_files(self):
-        for pattern in [
-            os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Cookies'),
-            os.path.expanduser('~/Library/Application Support/Google/Chrome/Profile */Cookies'),
-            os.path.expanduser('~/Library/Application Support/Vivaldi/Default/Cookies'),
-            os.path.expanduser('~/Library/Application Support/Vivaldi/Profile */Cookies'),
-            os.path.expanduser('~/.config/chromium/Default/Cookies'),
-            os.path.expanduser('~/.config/chromium/Profile */Cookies'),
-            os.path.expanduser('~/.config/google-chrome/Default/Cookies'),
-            os.path.expanduser('~/.config/google-chrome/Profile */Cookies'),
-            os.path.expanduser('~/.config/vivaldi/Default/Cookies'),
-            os.path.expanduser('~/.config/vivaldi/Profile */Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Default\Network\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Google\Chrome\User Data\Profile *\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Default\Cookies'),
-            os.path.join(os.getenv('APPDATA', ''), r'..\Local\Vivaldi\User Data\Profile *\Cookies'),
-        ]:
-            for result in glob.glob(pattern):
-                yield result
-
+class ChromeBased(BrowserCookieLoader):
     def get_cookies(self):
         salt = b'saltysalt'
         length = 16
@@ -148,32 +131,42 @@ class Chrome(BrowserCookieLoader):
             key = PBKDF2(my_pass, salt, length, iterations)
 
         elif sys.platform == 'win32':
-            path = r'%LocalAppData%\Google\Chrome\User Data\Local State'
-            path = os.path.expandvars(path)
-            with open(path, 'r') as file:
-                encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
-            encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
-            encrypted_key = encrypted_key[5:]  # Remove DPAPI
-            key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
+            # per-file encryption key location
+            pass
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
 
+        key_local_state_path = None
         for cookie_file in self.cookie_files:
+            if sys.platform == 'win32':
+                cookie_path = Path(cookie_file).absolute()
+                user_dir_path = next((p for p in cookie_path.parents if p.name == 'User Data'), None)
+                local_state_path = user_dir_path / 'Local State' if user_dir_path is not None else None
+                if local_state_path is None or not local_state_path.exists():
+                    raise BrowserCookieError('Failed to find Local State folder for cookie file ' + str(cookie_path))
+                if key_local_state_path != local_state_path:
+                    with open(local_state_path, 'rb') as file:
+                        encrypted_key = json.loads(file.read())['os_crypt']['encrypted_key']
+                    encrypted_key = base64.b64decode(encrypted_key)  # Base64 decoding
+                    encrypted_key = encrypted_key[5:]  # Remove DPAPI
+
+                    key_local_state_path = local_state_path
+                    key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
+
             with create_local_copy(cookie_file) as tmp_cookie_file:
-                con = sqlite3.connect(tmp_cookie_file)
-                cur = con.cursor()
-                cur.execute('SELECT value FROM meta WHERE key = "version";')
-                version = int(cur.fetchone()[0])
-                query = 'SELECT host_key, path, is_secure, expires_utc, name, value, encrypted_value FROM cookies;'
-                if version < 10:
-                    query = query.replace('is_', '')
-                cur.execute(query)
-                for item in cur.fetchall():
-                    host, path, secure, expires, name = item[:5]
-                    expires = expires /1e6  - 11644473600 # 1601/1/1
-                    value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
-                    yield create_cookie(host, path, secure, expires, name, value)
-                con.close()
+                with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
+                    cur = con.cursor()
+                    cur.execute('SELECT value FROM meta WHERE key = "version";')
+                    version = int(cur.fetchone()[0])
+                    query = 'SELECT host_key, path, is_secure, expires_utc, name, value, encrypted_value FROM cookies;'
+                    if version < 10:
+                        query = query.replace('is_', '')
+                    cur.execute(query)
+                    for item in cur.fetchall():
+                        host, path, secure, expires, name = item[:5]
+                        expires = expires / 1e6 - 11644473600  # 1601/1/1
+                        value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
+                        yield create_cookie(host, path, secure, expires, name, value)
 
     def _decrypt(self, value, encrypted_value, cookiename, sitename, key):
 
@@ -222,26 +215,127 @@ class Chrome(BrowserCookieLoader):
             return plaintext
 
 
+class Chrome(ChromeBased):
+    def __str__(self):
+        return 'chrome'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Google/Chrome/Profile */Cookies'),
+            os.path.expanduser('~/.config/google-chrome/Default/Cookies'),
+            os.path.expanduser('~/.config/google-chrome/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chrome\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chrome\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chrome\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class Chromium(ChromeBased):
+    def __str__(self):
+        return 'chromium'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Google/Chromium/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Google/Chromium/Profile */Cookies'),
+            os.path.expanduser('~/.config/chromium/Default/Cookies'),
+            os.path.expanduser('~/.config/chromium/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chromium\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chromium\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Google\Chromium\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class Vivaldi(ChromeBased):
+    def __str__(self):
+        return 'vivaldi'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Vivaldi/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Vivaldi/Profile */Cookies'),
+            os.path.expanduser('~/.config/vivaldi/Default/Cookies'),
+            os.path.expanduser('~/.config/vivaldi/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Vivaldi\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Vivaldi\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Vivaldi\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class Edge(ChromeBased):
+    def __str__(self):
+        return 'edge'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge/Profile */Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge/Default/Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
+class EdgeDev(ChromeBased):
+    def __str__(self):
+        return 'edge-dev'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge Dev/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/Microsoft/Edge Dev/Profile */Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge-dev/Default/Cookies'),
+            os.path.expanduser('~/.config/microsoft-edge-dev/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge Dev\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge Dev\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'Microsoft\Edge Dev\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
+
 class Firefox(BrowserCookieLoader):
     def __str__(self):
         return 'firefox'
 
     def parse_profile(self, profile):
+        profile_dir = Path(os.path.dirname(profile))
+
         cp = configparser.ConfigParser()
-        cp.read(profile)
+        cp.read(profile, encoding='utf-8')
+
         path = None
         for section in cp.sections():
-            try:
-                if cp.getboolean(section, 'IsRelative'):
-                    path = os.path.dirname(profile) + '/' + cp.get(section, 'Path')
-                else:
-                    path = cp.get(section, 'Path')
+            if section.startswith('Install'):
                 if cp.has_option(section, 'Default'):
-                    return os.path.abspath(os.path.expanduser(path))
-            except configparser.NoOptionError:
-                pass
+                    path = profile_dir / cp.get(section, 'Default')
+                    break
+            else:
+                try:
+                    if cp.getboolean(section, 'IsRelative'):
+                        profile_path = profile_dir / cp.get(section, 'Path')
+                    else:
+                        profile_path = Path(cp.get(section, 'Path'))
+
+                    if not path:
+                        path = profile_path
+                    elif cp.getboolean(section, 'Default'):
+                        path = profile_path
+                except configparser.NoOptionError:
+                    pass
         if path:
-            return os.path.abspath(os.path.expanduser(path))
+            return str(path.expanduser().absolute())
         raise BrowserCookieError('No default Firefox profile found')
 
     def find_default_profile(self):
@@ -261,33 +355,40 @@ class Firefox(BrowserCookieLoader):
         path = self.parse_profile(profile[0])
         if not path:
             raise BrowserCookieError('Could not find path to default Firefox profile')
-        cookie_files = glob.glob(os.path.expanduser(path + '/cookies.sqlite'))
-        if cookie_files:
-            return cookie_files
+
+        cookie_file = os.path.expanduser(path + '/cookies.sqlite')
+        if os.path.exists(cookie_file):
+            for session_file in [
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.js'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore.js'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore.json'),
+                os.path.join(os.path.dirname(cookie_file), 'sessionstore.jsonlz4'),
+            ]:
+                if os.path.exists(session_file):
+                    yield session_file
+            yield cookie_file
         else:
             raise BrowserCookieError('Failed to find Firefox cookies')
 
     def get_cookies(self):
+        has_session_files = False
         for cookie_file in self.cookie_files:
-            with create_local_copy(cookie_file) as tmp_cookie_file:
-                con = sqlite3.connect(tmp_cookie_file)
-                cur = con.cursor()
-                cur.execute('select host, path, isSecure, expiry, name, value from moz_cookies')
+            cookie_path = Path(cookie_file)
+            with create_local_copy(cookie_file, suffix=cookie_path.suffix) as tmp_cookie_file:
+                if cookie_path.suffix == '.sqlite':
+                    with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
+                        cur = con.cursor()
+                        cur.execute('select host, path, isSecure, expiry, name, value from moz_cookies')
 
-                for item in cur.fetchall():
-                    yield create_cookie(*item)
-                con.close()
-
-                # current sessions are saved in sessionstore.js/recovery.json/recovery.jsonlz4
-                session_files = (os.path.join(os.path.dirname(cookie_file), 'sessionstore.js'),
-                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.js'),
-                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.json'),
-                    os.path.join(os.path.dirname(cookie_file), 'sessionstore-backups', 'recovery.jsonlz4'))
-                for file_path in session_files:
-                    if os.path.exists(file_path):
-                        if file_path.endswith('4'):
+                        for item in cur.fetchall():
+                            yield create_cookie(*item)
+                else:
+                    json_data = None
+                    with open(tmp_cookie_file, 'rb') as session_file:
+                        if tmp_cookie_file.endswith('4'):
                             try:
-                                session_file = open(file_path, 'rb')
                                 # skip the first 8 bytes to avoid decompress failure (custom Mozilla header)
                                 session_file.seek(8)
                                 json_data = json.loads(lz4.block.decompress(session_file.read()).decode())
@@ -297,19 +398,21 @@ class Firefox(BrowserCookieLoader):
                                 print('Error parsing Firefox session file:', str(e))
                         else:
                             try:
-                                json_data = json.loads(open(file_path, 'rb').read().decode('utf-8'))
+                                json_data = json.loads(session_file.read().decode('utf-8'))
                             except IOError as e:
                                 print('Could not read file:', str(e))
                             except ValueError as e:
                                 print('Error parsing firefox session JSON:', str(e))
 
-                if 'json_data' in locals():
-                    expires = str(int(time.time()) + 3600 * 24 * 7)
-                    for window in json_data.get('windows', []) + [json_data]:
-                        for cookie in window.get('cookies', []):
-                            yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
-                else:
-                    print('Could not find any Firefox session files')
+                    if json_data is not None:
+                        has_session_files = True
+                        expires = str(int(time.time()) + 3600 * 24 * 7)
+                        for window in json_data.get('windows', []) + [json_data]:
+                            for cookie in window.get('cookies', []):
+                                yield create_cookie(cookie.get('host', ''), cookie.get('path', ''), False, expires, cookie.get('name', ''), cookie.get('value', ''))
+        if not has_session_files:
+            print('Could not find any Firefox session files')
+
 
 class Safari(BrowserCookieLoader):
     def __str__(self):
@@ -430,29 +533,58 @@ def create_cookie(host, path, secure, expires, name, value):
     """
     return cookielib.Cookie(0, name, value, None, False, host, host.startswith('.'), host.startswith('.'), path, True, secure, expires, False, None, None, {})
 
-def chrome(cookie_file=None):
+
+def chrome(cookie_files=None):
     """Returns a cookiejar of the cookies used by Chrome
     """
-    return Chrome(cookie_file).load()
+    return Chrome(cookie_files).load()
 
-def firefox(cookie_file=None):
+
+def chromium(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Chromium
+    """
+    return Chromium(cookie_files).load()
+
+
+def vivaldi(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Vivaldi
+    """
+    return Vivaldi(cookie_files).load()
+
+
+def edge(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Microsoft Edge
+    """
+    return Edge(cookie_files).load()
+
+
+def edge_dev(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Microsoft Edge Dev
+    """
+    return EdgeDev(cookie_files).load()
+
+
+def firefox(cookie_files=None):
     """Returns a cookiejar of the cookies and sessions used by Firefox
     """
-    return Firefox(cookie_file).load()
+    return Firefox(cookie_files).load()
 
-def safari(cookie_file=None):
+
+def safari(cookie_files=None):
     """Returns a cookiejar of the cookies used by safari
     """
-    return Safari(cookie_file).load()
+    return Safari(cookie_files).load()
+
 
 def _get_cookies():
     '''Return all cookies from all browsers'''
-    for klass in [Chrome, Firefox]:
+    for klass in [Chrome, Chromium, Vivaldi, Edge, EdgeDev, Firefox]:
         try:
             for cookie in klass().get_cookies():
                 yield cookie
         except BrowserCookieError:
             pass
+
 
 def load():
     """Try to load cookies from all supported browsers and return combined cookiejar
