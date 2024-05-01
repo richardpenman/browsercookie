@@ -342,7 +342,9 @@ class Firefox(BrowserCookieLoader):
         if sys.platform == 'darwin':
             return glob.glob(os.path.expanduser('~/Library/Application Support/Firefox/profiles.ini'))
         elif sys.platform.startswith('linux'):
-            return glob.glob(os.path.expanduser('~/.mozilla/firefox/profiles.ini'))
+            trad_filename = glob.glob(os.path.expanduser('~/.mozilla/firefox/profiles.ini'))
+            snap_filename = glob.glob(os.path.expanduser('~/snap/firefox/common/.mozilla/firefox/profiles.ini'))
+            return trad_filename + snap_filename
         elif sys.platform == 'win32':
             return glob.glob(os.path.join(os.getenv('APPDATA', ''), 'Mozilla/Firefox/profiles.ini'))
         else:
