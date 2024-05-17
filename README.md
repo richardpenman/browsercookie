@@ -9,83 +9,71 @@ login.
 Install
 -------
 
-.. sourcecode:: bash
-
-        pip install browsercookie
+```python
+pip install browsercookie
+```
 
 On Windows the builtin sqlite module will raise an error when loading
 the FireFox database. An updated version of sqlite can be installed with:
 
-.. sourcecode:: bash
-
-        pip install pysqlite
+```python
+pip install pysqlite
+```
 
 Usage
 -----
 
 Here is a hack to extract the title from a webpage:
 
-.. sourcecode:: python
-
-    >>> import re
-    >>> get_title = lambda html: re.findall('<title>(.*?)</title>', html, flags=re.DOTALL)[0].strip()
+```python
+>>> import re
+>>> get_title = lambda html: re.findall('<title>(.*?)</title>', html, flags=re.DOTALL)[0].strip()
+```
 
 And here is the webpage title when downloaded normally:
 
-.. sourcecode:: python
-
-    >>> import urllib2
-    >>> url = 'https://bitbucket.org/'
-    >>> public_html = urllib2.urlopen(url).read()
-    >>> get_title(public_html)
-    'Git and Mercurial code management for teams'
+```python
+>>> import urllib2
+>>> url = 'https://bitbucket.org/'
+>>> public_html = urllib2.urlopen(url).read()
+>>> get_title(public_html)
+'Git and Mercurial code management for teams'
+```
 
 Now let's try with **browsercookie** - make sure you are logged into
 Bitbucket in Firefox before trying this example:
 
-.. sourcecode:: python
-
-    >>> import browsercookie
-    >>> cj = browsercookie.firefox()
-    >>> opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    >>> login_html = opener.open(url).read()
-    >>> get_title(login_html)
-    'richardpenman / home &mdash; Bitbucket'
-
-Differences with Python3:
-
-.. sourcecode:: python
- 
-    >>> import urllib.request
-    >>> public_html = urllib.request.urlopen(url).read()
-    >>> opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-
+```python
+>>> import urllib.request
+>>> public\_html = urllib.request.urlopen(url).read()
+>>> opener = urllib.request.build\_opener(urllib.request.HTTPCookieProcessor(cj))
+```
 
 You should see your own username here, meaning the module successfully
 loaded the cookies from Firefox.
 
 Here is an alternative example with
-`requests <http://docs.python-requests.org/en/latest/>`__, this time
+[requests](http://docs.python-requests.org/en/latest/), this time
 loading the Chrome cookies. Again make sure you are logged into
 Bitbucket in Chrome before running this:
 
-.. sourcecode:: python
-
-    >>> import requests
-    >>> cj = browsercookie.chrome()
-    >>> r = requests.get(url, cookies=cj)
-    >>> get_title(r.content)
-    'richardpenman / home &mdash; Bitbucket'
+```python
+>>> import requests
+>>> cj = browsercookie.chrome()
+>>> r = requests.get(url, cookies=cj)
+>>> get_title(r.content)
+'richardpenman / home &mdash; Bitbucket'
+```
 
 Alternatively if you don't know/care which browser has the cookies you
 want then all available browser cookies can be loaded:
 
-.. sourcecode:: python
-    
-    >>> cj = browsercookie.load()
-    >>> r = requests.get(url, cookies=cj)
-    >>> get_title(r.content)
-    'richardpenman / home &mdash; Bitbucket'
+```python
+>>> cj = browsercookie.load()
+>>> r = requests.get(url, cookies=cj)
+>>> get_title(r.content)
+'richardpenman / home &mdash; Bitbucket'
+```
 
 Contribute
 ----------
@@ -106,5 +94,5 @@ Internet Explorer on Windows.
 Acknowledgements
 ----------------
 
-* Nathan Henrie for his example of `how to decode the Chrome cookies <http://n8henrie.com/2013/11/use-chromes-cookies-for-easier-downloading-with-python-requests/>`__
+* Nathan Henrie for his example of [http://n8henrie.com/2013/11/use-chromes-cookies-for-easier-downloading-with-python-requests/](how to decode the Chrome cookies)
 * Graeme Robinson for his Chrome Windows patch
