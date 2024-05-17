@@ -85,8 +85,8 @@ So far the following platforms are supported:
 
 However I only tested on a single version of each browser and so am not
 sure if the cookie sqlite format changes location or format in
-earlier/later versions. If you experience a problem please `open an
-issue <https://bitbucket.org/richardpenman/browsercookie/issues/new>`__
+earlier/later versions. If you experience a problem please [open an
+issue](https://github.com/richardpenman/browsercookie/issues/new)
 which includes details of the browser version and operating system. Also
 patches to support other browsers are very welcome, particularly for
 Internet Explorer on Windows.
@@ -94,5 +94,5 @@ Internet Explorer on Windows.
 Acknowledgements
 ----------------
 
-* Nathan Henrie for his example of [http://n8henrie.com/2013/11/use-chromes-cookies-for-easier-downloading-with-python-requests/](how to decode the Chrome cookies)
+* Nathan Henrie for his example of [how to decode the Chrome cookies](http://n8henrie.com/2013/11/use-chromes-cookies-for-easier-downloading-with-python-requests/)
 * Graeme Robinson for his Chrome Windows patch
