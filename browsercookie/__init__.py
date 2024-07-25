@@ -232,6 +232,23 @@ class Chrome(ChromeBased):
             for result in glob.glob(pattern):
                 yield result
 
+class Brave(ChromeBased):
+    def __str__(self):
+        return 'vivaldi'
+
+    def find_cookie_files(self):
+        for pattern in [
+            os.path.expanduser('~/Library/Application Support/BraveSoftware/Brave-Browser/Default/Cookies'),
+            os.path.expanduser('~/Library/Application Support/BraveSoftware/Brave-Browser/Profile */Cookies'),
+            os.path.expanduser('~/.config/BraveSoftware/Brave-Browser/Default/Cookies'),
+            os.path.expanduser('~/.config/BraveSoftware/Brave-Browser/Profile */Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'BraveSoftware\Brave-Browser\User Data\Default\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'BraveSoftware\Brave-Browser\User Data\Default\Network\Cookies'),
+            os.path.join(os.getenv('LOCALAPPDATA', ''), r'BraveSoftware\Brave-Browser\User Data\Profile *\Cookies'),
+        ]:
+            for result in glob.glob(pattern):
+                yield result
+
 
 class Chromium(ChromeBased):
     def __str__(self):
@@ -267,7 +284,6 @@ class Vivaldi(ChromeBased):
         ]:
             for result in glob.glob(pattern):
                 yield result
-
 
 class Edge(ChromeBased):
     def __str__(self):
@@ -535,6 +551,10 @@ def create_cookie(host, path, secure, expires, name, value):
     """
     return cookielib.Cookie(0, name, value, None, False, host, host.startswith('.'), host.startswith('.'), path, True, secure, expires, False, None, None, {})
 
+def brave(cookie_files=None):
+    """Returns a cookiejar of the cookies used by Brave
+    """
+    return Brave(cookie_files).load()
 
 def chrome(cookie_files=None):
     """Returns a cookiejar of the cookies used by Chrome
@@ -580,7 +600,7 @@ def safari(cookie_files=None):
 
 def _get_cookies():
     '''Return all cookies from all browsers'''
-    for klass in [Chrome, Chromium, Vivaldi, Edge, EdgeDev, Firefox]:
+    for klass in [Brave, Chrome, Chromium, Vivaldi, Edge, EdgeDev, Firefox]:
         try:
             for cookie in klass().get_cookies():
                 yield cookie
