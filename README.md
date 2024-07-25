@@ -82,6 +82,7 @@ So far the following platforms are supported:
 
 -  **Chrome:** Linux, OSX, Windows
 -  **Firefox:** Linux, OSX, Windows
+-  **Brave:** Linux, OSX, Windows
 
 However I only tested on a single version of each browser and so am not
 sure if the cookie sqlite format changes location or format in
