@@ -234,7 +234,7 @@ class Chrome(ChromeBased):
 
 class Brave(ChromeBased):
     def __str__(self):
-        return 'vivaldi'
+        return 'brave'
 
     def find_cookie_files(self):
         for pattern in [
