@@ -105,16 +105,17 @@ class ChromeBased(BrowserCookieLoader):
     def get_cookies(self):
         salt = b'saltysalt'
         length = 16
+        keys = []
         if sys.platform == 'darwin':
             # running Chrome on OSX
             my_pass = keyring.get_password('Chrome Safe Storage', 'Chrome')
             my_pass = my_pass.encode('utf8')
             iterations = 1003
-            key = PBKDF2(my_pass, salt, length, iterations)
+            keys = [PBKDF2(my_pass, salt, length, iterations)]
 
         elif sys.platform.startswith('linux'):
             # running Chrome on Linux
-            my_pass = 'peanuts'.encode('utf8')
+            passwords = [b'peanuts']  # v10 key
             try:
                 import secretstorage
 
@@ -122,13 +123,12 @@ class ChromeBased(BrowserCookieLoader):
                 collection = secretstorage.get_default_collection(bus)
                 for item in collection.get_all_items():
                     if item.get_label() in ['Chromium Safe Storage', 'Chrome Safe Storage']:
-                        my_pass = item.get_secret()
-                        break
+                        passwords.append(item.get_secret())
             except Exception as e:
                 print(e)
 
             iterations = 1
-            key = PBKDF2(my_pass, salt, length, iterations)
+            keys = [PBKDF2(my_pass, salt, length, iterations) for my_pass in passwords]
 
         elif sys.platform == 'win32':
             # per-file encryption key location
@@ -151,7 +151,7 @@ class ChromeBased(BrowserCookieLoader):
                     encrypted_key = encrypted_key[5:]  # Remove DPAPI
 
                     key_local_state_path = local_state_path
-                    key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]  # Decrypt key
+                    keys = [win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]]  # Decrypt key
 
             with create_local_copy(cookie_file) as tmp_cookie_file:
                 with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
@@ -165,8 +165,17 @@ class ChromeBased(BrowserCookieLoader):
                     for item in cur.fetchall():
                         host, path, secure, expires, name = item[:5]
                         expires = expires / 1e6 - 11644473600  # 1601/1/1
-                        value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
-                        yield create_cookie(host, path, secure, expires, name, value)
+                        for key in keys:
+                            try:
+                                value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
+                            except (UnicodeDecodeError, ValueError):
+                                pass
+                            else:
+                                yield create_cookie(host, path, secure, expires, name, value)
+                                break
+                        else:
+                            raise BrowserCookieError("Error decrypting cookie " + name + " for " + host)
+
 
     def _decrypt(self, value, encrypted_value, cookiename, sitename, key):
 
@@ -184,10 +193,13 @@ class ChromeBased(BrowserCookieLoader):
             # eg if last is '\x0e' then ord('\x0e') == 14, so take off 14.
             def clean(x):
                 last = x[-1]
-                if isinstance(last, int):
-                    return x[:-last].decode('utf8')
-                else:
-                    return x[:-ord(last)].decode('utf8')
+                if not isinstance(last, int):
+                    last = ord(last)
+                if last == 0 or last >= len(x):
+                    raise ValueError("Invalid padding length for cookie " + cookiename + " of site " + sitename)
+                if x[-last:] != bytes([last]) * last:
+                    raise ValueError("Invalid padding value for cookie " + cookiename + " of site " + sitename)
+                return x[:-last].decode("ascii")
 
             iv = b' ' * 16
             cipher = AES.new(key, AES.MODE_CBC, IV=iv)
