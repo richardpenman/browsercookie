@@ -109,18 +109,16 @@ class ChromeBased(BrowserCookieLoader):
             passwords = [my_pass]
 
         elif sys.platform.startswith('linux'):
+            import secretstorage
+
             # running Chrome on Linux
             passwords = [b'peanuts']  # v10 key
-            try:
-                import secretstorage
 
-                bus = secretstorage.dbus_init()
+            with contextlib.closing(secretstorage.dbus_init()) as bus:
                 collection = secretstorage.get_default_collection(bus)
-                for item in collection.get_all_items():
-                    if item.get_label() in ['Chromium Safe Storage', 'Chrome Safe Storage']:
-                        passwords.append(item.get_secret())
-            except Exception as e:
-                print(e)
+                schema = "chrome_libsecret_os_crypt_password_v2"
+                for item in collection.search_items({"xdg:schema": schema}):
+                    passwords.append(item.get_secret())
 
             iterations = 1
 
