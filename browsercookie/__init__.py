@@ -177,7 +177,7 @@ class ChromeBased(BrowserCookieLoader):
                         expires = expires / 1e6 - 11644473600  # 1601/1/1
                         for key in keys:
                             try:
-                                value = self._decrypt(item[5], item[6], name, path, key)
+                                value = self._decrypt(item[5], item[6], name, path, key, version)
                             except (UnicodeDecodeError, ValueError):
                                 pass
                             else:
@@ -187,7 +187,7 @@ class ChromeBased(BrowserCookieLoader):
                             raise BrowserCookieError("Error decrypting cookie " + name + " for " + host)
 
 
-    def _decrypt(self, value, encrypted_value, cookiename, sitename, key):
+    def _decrypt(self, value, encrypted_value, cookiename, sitename, key, version):
 
         """Decrypt encoded cookies
         """
@@ -207,7 +207,6 @@ class ChromeBased(BrowserCookieLoader):
 
             unpadder = padding.PKCS7(aes.block_size).unpadder()
             plaintext = unpadder.update(plaintext) + unpadder.finalize()
-            return plaintext.decode("utf-8")
         else:
             # Must be win32 (on win32, all chrome cookies are encrypted)
 
@@ -221,15 +220,18 @@ class ChromeBased(BrowserCookieLoader):
                     cipher = Cipher(algorithms.AES(key), modes.GCM(nonce, tag))
                     decryptor = cipher.decryptor()
                     plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-                    plaintext = plaintext.decode("utf-8")
                 except:
                     raise BrowserCookieError("Error decrypting V80+ cookie: " + str(cookiename) + " from site " + str(sitename))
             else:
                 try:
-                    plaintext = win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1].decode("utf-8")
+                    plaintext = win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1]
                 except:
                     raise BrowserCookieError("Error decrypting cookie: " + str(cookiename) + " from site " + str(sitename))
-            return plaintext
+
+        if version >= 24:
+            plaintext = plaintext[32:]
+
+        return plaintext.decode("utf-8")
 
 
 class Chrome(ChromeBased):
