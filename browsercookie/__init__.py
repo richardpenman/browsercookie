@@ -161,6 +161,7 @@ class ChromeBased(BrowserCookieLoader):
 
             with create_local_copy(cookie_file) as tmp_cookie_file:
                 with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
+                    con.text_factory = bytes
                     cur = con.cursor()
                     cur.execute('SELECT value FROM meta WHERE key = "version";')
                     version = int(cur.fetchone()[0])
@@ -170,10 +171,13 @@ class ChromeBased(BrowserCookieLoader):
                     cur.execute(query)
                     for item in cur.fetchall():
                         host, path, secure, expires, name = item[:5]
+                        host = host.decode("utf-8")
+                        path = path.decode("utf-8")
+                        name = name.decode("utf-8")
                         expires = expires / 1e6 - 11644473600  # 1601/1/1
                         for key in keys:
                             try:
-                                value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
+                                value = self._decrypt(item[5], item[6], name, path, key)
                             except (UnicodeDecodeError, ValueError):
                                 pass
                             else:
