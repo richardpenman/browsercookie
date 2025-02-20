@@ -26,14 +26,9 @@ try:
     import ConfigParser as configparser
 except ImportError:
     import configparser
-try:
-    # should use Cryptodome in windows instead of Crypto
-    # otherwise will raise an import error
-    from Cryptodome.Protocol.KDF import PBKDF2
-    from Cryptodome.Cipher import AES
-except ImportError:
-    from Crypto.Protocol.KDF import PBKDF2
-    from Crypto.Cipher import AES
+from cryptography.hazmat.primitives import hashes, padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 try:
     # should use pysqlite2 to read the cookies.sqlite on Windows
@@ -111,30 +106,39 @@ class ChromeBased(BrowserCookieLoader):
             my_pass = keyring.get_password('Chrome Safe Storage', 'Chrome')
             my_pass = my_pass.encode('utf8')
             iterations = 1003
-            keys = [PBKDF2(my_pass, salt, length, iterations)]
+            passwords = [my_pass]
 
         elif sys.platform.startswith('linux'):
+            import secretstorage
+
             # running Chrome on Linux
             passwords = [b'peanuts']  # v10 key
-            try:
-                import secretstorage
 
-                bus = secretstorage.dbus_init()
+            with contextlib.closing(secretstorage.dbus_init()) as bus:
                 collection = secretstorage.get_default_collection(bus)
-                for item in collection.get_all_items():
-                    if item.get_label() in ['Chromium Safe Storage', 'Chrome Safe Storage']:
-                        passwords.append(item.get_secret())
-            except Exception as e:
-                print(e)
+                schema = "chrome_libsecret_os_crypt_password_v2"
+                for item in collection.search_items({"xdg:schema": schema}):
+                    passwords.append(item.get_secret())
 
             iterations = 1
-            keys = [PBKDF2(my_pass, salt, length, iterations) for my_pass in passwords]
 
         elif sys.platform == 'win32':
             # per-file encryption key location
-            pass
+            passwords = []
+            iterations = 0
         else:
             raise BrowserCookieError('Unsupported operating system: ' + sys.platform)
+
+        if passwords and iterations:
+            sha1 = hashes.SHA1()
+            for my_pass in passwords:
+                kdf = PBKDF2HMAC(
+                    algorithm=sha1,
+                    length=length,
+                    salt=salt,
+                    iterations=iterations,
+                )
+                keys.append(kdf.derive(my_pass))
 
         key_local_state_path = None
         for cookie_file in self.cookie_files:
@@ -155,6 +159,7 @@ class ChromeBased(BrowserCookieLoader):
 
             with create_local_copy(cookie_file) as tmp_cookie_file:
                 with contextlib.closing(sqlite3.connect(tmp_cookie_file)) as con:
+                    con.text_factory = bytes
                     cur = con.cursor()
                     cur.execute('SELECT value FROM meta WHERE key = "version";')
                     version = int(cur.fetchone()[0])
@@ -164,10 +169,13 @@ class ChromeBased(BrowserCookieLoader):
                     cur.execute(query)
                     for item in cur.fetchall():
                         host, path, secure, expires, name = item[:5]
+                        host = host.decode("utf-8")
+                        path = path.decode("utf-8")
+                        name = name.decode("utf-8")
                         expires = expires / 1e6 - 11644473600  # 1601/1/1
                         for key in keys:
                             try:
-                                value = self._decrypt(item[5], item[6], item[4], item[1], key=key)
+                                value = self._decrypt(item[5], item[6], name, path, key, version)
                             except (UnicodeDecodeError, ValueError):
                                 pass
                             else:
@@ -177,7 +185,7 @@ class ChromeBased(BrowserCookieLoader):
                             raise BrowserCookieError("Error decrypting cookie " + name + " for " + host)
 
 
-    def _decrypt(self, value, encrypted_value, cookiename, sitename, key):
+    def _decrypt(self, value, encrypted_value, cookiename, sitename, key, version):
 
         """Decrypt encoded cookies
         """
@@ -189,22 +197,14 @@ class ChromeBased(BrowserCookieLoader):
             # Chromium code. Strip it off.
             encrypted_value = encrypted_value[3:]
 
-            # Strip padding by taking off number indicated by padding
-            # eg if last is '\x0e' then ord('\x0e') == 14, so take off 14.
-            def clean(x):
-                last = x[-1]
-                if not isinstance(last, int):
-                    last = ord(last)
-                if last == 0 or last >= len(x):
-                    raise ValueError("Invalid padding length for cookie " + cookiename + " of site " + sitename)
-                if x[-last:] != bytes([last]) * last:
-                    raise ValueError("Invalid padding value for cookie " + cookiename + " of site " + sitename)
-                return x[:-last].decode("ascii")
+            aes = algorithms.AES(key)
+            iv = b' ' * (aes.block_size // 8)
+            cipher = Cipher(aes, modes.CBC(iv))
+            decryptor = cipher.decryptor()
+            plaintext = decryptor.update(encrypted_value) + decryptor.finalize()
 
-            iv = b' ' * 16
-            cipher = AES.new(key, AES.MODE_CBC, IV=iv)
-            decrypted = cipher.decrypt(encrypted_value)
-            return clean(decrypted)
+            unpadder = padding.PKCS7(aes.block_size).unpadder()
+            plaintext = unpadder.update(plaintext) + unpadder.finalize()
         else:
             # Must be win32 (on win32, all chrome cookies are encrypted)
 
@@ -215,16 +215,21 @@ class ChromeBased(BrowserCookieLoader):
                     nonce = data[3:3 + 12]
                     ciphertext = data[3 + 12:-16]
                     tag = data[-16:]
-                    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-                    plaintext = cipher.decrypt_and_verify(ciphertext, tag).decode("utf-8")  # the decrypted cookie
+                    cipher = Cipher(algorithms.AES(key), modes.GCM(nonce, tag))
+                    decryptor = cipher.decryptor()
+                    plaintext = decryptor.update(ciphertext) + decryptor.finalize()
                 except:
                     raise BrowserCookieError("Error decrypting V80+ cookie: " + str(cookiename) + " from site " + str(sitename))
             else:
                 try:
-                    plaintext = win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1].decode("utf-8")
+                    plaintext = win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1]
                 except:
                     raise BrowserCookieError("Error decrypting cookie: " + str(cookiename) + " from site " + str(sitename))
-            return plaintext
+
+        if version >= 24:
+            plaintext = plaintext[32:]
+
+        return plaintext.decode("utf-8")
 
 
 class Chrome(ChromeBased):
