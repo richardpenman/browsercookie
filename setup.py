@@ -16,7 +16,7 @@ setup(
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
     url='https://github.com/richardpenman/browsercookie',
-    install_requires=['pycryptodome', 'keyring', 'lz4',
+    install_requires=['cryptography', 'keyring', 'lz4',
                       'pywin32; sys_platform == "win32"'],
     license='lgpl'
 )
