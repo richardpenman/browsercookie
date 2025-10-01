@@ -418,6 +418,9 @@ class Firefox(BrowserCookieLoader):
                         cur.execute('select host, path, isSecure, expiry, name, value from moz_cookies')
 
                         for item in cur.fetchall():
+                            # Firefox expiry time is in ms rather than s. Python expects s
+                            # Convert expiry (4th field) to seconds by dividing by 1000
+                            item = (v if i != 3 else v/1000 for i, v in enumerate(item))
                             yield create_cookie(*item)
                 else:
                     json_data = None
