@@ -7,7 +7,7 @@ def read(filename):
 
 setup(
     name='browsercookie', 
-    version='0.8.1',
+    version='0.8.2',
     python_requires='>=3.4',
     packages=['browsercookie'],
     author='Richard Penman',
